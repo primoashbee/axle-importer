@@ -21,8 +21,17 @@ def process_row_other(row):
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
+    taskId = getRelatedId('tasks','migration_source_id',row['id'])
+    if taskId:
+        print(f"Task with ID {row['id']} already exists. Skipping")
+        return False
+    authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
+    assigneeId = getRelatedId('users','migration_source_id',row['attendant_id'])
+
+    if(assigneeId == None):
+        return False
     task_object = {
-        "author_id":"2",
+        "author_id": authorId,
         "customer_id":attendant['customer_id'],
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
@@ -64,8 +73,10 @@ def create_task(task_object):
         is_automated,
         deleted_at,
         created_at,
-        updated_at
+        updated_at,
+        migration_source_id
     ) VALUES (
+        %s,
         %s,
         %s,
         %s,
@@ -102,7 +113,8 @@ def create_task(task_object):
         task_object['is_automated'],
         task_object['deleted_at'],
         task_object['created_at'],
-        task_object['updated_at']
+        task_object['updated_at'],
+        task_object['migration_source_id'],
     ))
     conn.commit()
     task_id = cursor.fetchone()[0]
