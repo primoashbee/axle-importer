@@ -15,6 +15,10 @@ def process_row(row):
 
 
 def process_row_other(row):
+    mig_id = getRelatedId('tasks','migration_source_id',row['id'])
+    if (mig_id != None):
+        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
         print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
@@ -26,9 +30,13 @@ def process_row_other(row):
         print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
-    assigneeId = getRelatedId('users','migration_source_id',row['attendant_id'])
+    assigneeId = getRelatedId('users','migration_source_id',row['userID'])
+
+    assignee = get_username(assigneeId)
+    author =get_username(authorId)
 
     if(assigneeId == None):
+        print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -48,9 +56,27 @@ def process_row_other(row):
         "created_at": created_date,
         "updated_at":created_date,
         "parent_id":None,
-        "migration_source_id": row['id']
+        "migration_source_id": row['id'],
+        "attendant": attendant,
+        "event_title": "task_created",
+        "event": {
+            "task_category": "Task",
+            "task_priority": "Normal",
+            "task_status": "Assigned",
+            "task_assignee_text": f"Assigned to {assignee} by {author}",
+            "task_details": "gg",
+            "task_created_by": author,
+            "task_due_date": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "task_asignee_id":assigneeId,
+            "task_author_id":authorId,
+            "task_asignee_name": assignee,
+            "task_author_name": author
+        }
     }
     create_task(task_object)
+
+
+    
     return True
 
     
@@ -118,7 +144,7 @@ def create_task(task_object):
     ))
     conn.commit()
     task_id = cursor.fetchone()[0]
-    createEventLog("Domain\\Tasks\\Models\\Task",task_id, "created", task_object, datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))
+    createEventLog(task_object['attendant']['attendant_type'],task_object['attendant']['attendant_id'], task_object['event_title'], task_object['event'], task_object['created_at'])
     return task_id
 
 
@@ -126,13 +152,20 @@ def create_task(task_object):
 def get_attendant(attendant_type, id):
     attendant = {
         'lead_id': None,
-        'customer_id': None
+        'customer_id': None,
+        'attendant_type': "",
     }
     match attendant_type:
         case "lead":
-            attendant['lead_id'] = getRelatedId('leads','migration_source_id',id)
+            attendant_id = getRelatedId('leads','migration_source_id',id)
+            attendant['lead_id'] = attendant_id
+            attendant['attendant_id'] = attendant_id
+            attendant['attendant_type'] = 'lead'
         case "customer":
-            attendant['customer_id'] = getRelatedId('customers','migration_source_id',id)
+            attendant_id = getRelatedId('customers  ','migration_source_id',id)
+            attendant['customer_id'] = attendant_id
+            attendant['attendant_id'] = attendant_id
+            attendant['attendant_type'] = 'customer'
     return attendant
 
 
@@ -144,6 +177,7 @@ def read_csv():
         reader = csv.DictReader(file)
         with Pool(processes=10) as pool:
             result =pool.map(process_row, reader)
+            
             succeeded = len([item for item in result if item == True])
             print(f'{succeeded} of {len(result)} imported')
 
