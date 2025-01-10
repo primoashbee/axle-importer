@@ -13,23 +13,6 @@ def execute():
 
         for row in reader:
             row = {key: (None if value == 'NULL' else value) for key, value in row.items()}
-            row = {
-                    'parentID': '914', 'leadID': '914', 'firstName': 'Test', 'lastName': 'ref:_00D30WKx._50033yNwr9:ref', 
-                    'middleInitial': 'L', 'name': 'TEST L REF:_00D30WKX._50033YNWR9:REF', 'phone': '8885290281', 
-                    'email': 'testleads@cars.com', 'streetAddress': None, 'city': None, 'province': None, 
-                    'postalCode': None, 'address': '', 'sourceName': 'Cars.com', 'sourceType': 'Internet', 
-                    'check_for_duplicate': '0', 'latestInterestID': None, 'vin': None, 'stockNumber': None, 
-                    'year': None, 'make': None, 'model': None, 'trim': None, 'condition': None, 'type': None, 
-                    'listing': '', 'status': 'new', 'state': 'active', 'soldDate': None, 'latestSubmission': '2016-07-12 17:00:14', 
-                    'createdAt': '2016-07-12 17:00:14', 'updatedAt': '2017-01-09 10:10:09', 'creatorID': '42', 
-                    'agentID': None, 'agent_firstName': None, 'agent_lastName': None, 'agent_email': None, 
-                    'agent_name': None, 'agent_role': None, 'customerID': None, 'lastContact': None, 'nextContact': None, 
-                    'Latitude': None, 'Longitude': None, 'lastActionTaken': None, 'lastActionResult': None, 
-                    'campaignCheck': None, 'campaignCheckTime': None, 'originId': None, 'mergedByID': None, 
-                    'mergedAt': None, 'teamID': None, 'dealershipID': '2'
-                }
-            print(row)
-            exit()
             is_internet = True if row['sourceType'] == 'Internet' else False
             leadSourceId = getLeadSourceId(row['sourceName'], is_internet);
             leadStatusID = getLeadStatus(row['status']);
@@ -75,13 +58,15 @@ def createLeadSource(source, is_internet):
         name, website, is_internet
     ) VALUES (
         %s, %s, %s
-    )
+    ) RETURNING id
     """
     cursor.execute(insert_query, (
         source, source, is_internet
     ))
+    insert_id = cursor.fetchone()[0]
     conn.commit()
-    return cursor.lastrowid
+
+    return insert_id
 
 def getLeadStatus(status):
     query = "SELECT id FROM lead_statuses WHERE lower(name) = %s"
@@ -121,7 +106,6 @@ def createUser(data):
     return cursor.lastrowid
 
 def createLead(data):
-
     insert_query = """
     INSERT INTO leads (
         first_name, last_name, phone_number, email, 

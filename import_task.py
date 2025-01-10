@@ -2,15 +2,35 @@ import csv
 import os
 from  helpers import *
 from multiprocessing import Pool
-task_type = 'todo'
+"""
+To do ✅
+Phone Call ✅ > Create Phone Logs
+Call ❓ 
+Callback ✅
+Appointment ⚙️
+Reminder ✅
+Other 🟢
+"""
+task_type = 'other'
 
 
 def process_row(row):
     match task_type:
-        case 'other':
-            return process_row_other(row)
         case 'todo':
             return process_row_todo(row)
+        case 'phone_call':
+            return process_row_phone_call(row)
+        case 'call':
+            return process_row_call(row)
+        case 'callback':
+            return process_row_callback(row)
+        case 'appointment':
+            print("Waiting")
+        case 'reminder':
+            return process_row_reminder(row)
+        case 'other':
+            return process_row_other(row)
+   
         case _:
             print(f"Invalid task_type '{task_type}'")
             
@@ -53,7 +73,7 @@ def process_row_other(row):
         "date_accepted":None,
         "details": row['description'],
         "location":None,
-        "is_automated":"1",
+        "is_automated":"0",
         "deleted_at":None,
         "created_at": created_date,
         "updated_at":created_date,
@@ -62,11 +82,11 @@ def process_row_other(row):
         "attendant": attendant,
         "event_title": "task_created",
         "event": {
-            "task_category": "Task",
+            "task_category": "Other",
             "task_priority": "Normal",
-            "task_status": "Assigned",
+            "task_status": row["status"].capitalize(),
             "task_assignee_text": f"Assigned to {assignee} by {author}",
-            "task_details": "gg",
+            "task_details": row['description'],
             "task_created_by": author,
             "task_due_date": time.strftime('%Y-%m-%d %H:%M:%S'),
             "task_asignee_id":assigneeId,
@@ -127,9 +147,9 @@ def process_row_todo(row):
         "attendant": attendant,
         "event_title": "task_todo_created",
         "event": {
-            "task_category": "Task",
+            "task_category": "To Do",
             "task_priority": "Normal",
-            "task_status": "Assigned",
+            "task_status": row["status"].capitalize(),
             "task_assignee_text": f"Assigned to {assignee} by {author}",
             "task_details": row['description'],
             "task_created_by": author,
@@ -141,11 +161,317 @@ def process_row_todo(row):
         }
     }
     create_task(task_object)
-
-
-    
     return True
 
+def process_row_phone_call(row):
+    mig_id = getRelatedId('tasks','migration_source_id',row['id'])
+    if (mig_id != None):
+        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        return False
+    attendant = get_attendant(row['attendant_type'],row['attendant_id'])
+    if(attendant['lead_id'] == None and attendant['customer_id'] == None):
+        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        return False
+    created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
+    time = time_es_to_utc(row['time'])
+    taskId = getRelatedId('tasks','migration_source_id',row['id'])
+    if taskId:
+        print(f"Task with ID {row['id']} already exists. Skipping")
+        return False
+    authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
+    assigneeId = getRelatedId('users','migration_source_id',row['userID'])
+
+    assignee = get_username(assigneeId)
+    author =get_username(authorId)
+
+    if(assigneeId == None):
+        print(f"no assignee {assigneeId}")
+        return False
+    task_object = {
+        "author_id": authorId,
+        "customer_id":attendant['customer_id'],
+        "lead_id":attendant['lead_id'],
+        "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
+        "task_status_id":getRelatedId('task_statuses','slug',row['status']),
+        "task_category_id":getRelatedId('task_categories','slug','phone-call'),
+        "task_priority_id":"2",
+        "due_date":time.strftime('%Y-%m-%d'),
+        "due_time":time.strftime('%H:%M:%S'),
+        "date_accepted":None,
+        "details": row['description'],
+        "location":None,
+        "is_automated":"1",
+        "deleted_at":None,
+        "created_at": created_date,
+        "updated_at":created_date,
+        "parent_id":None,
+        "migration_source_id": row['id'],
+        "attendant": attendant,
+        "event_title": "task_phone_call_created",
+        "event": {
+            "task_category": "Phone Call",
+            "task_priority": "Normal",
+            "task_status": row["status"].capitalize(),
+            "task_assignee_text": f"Assigned to {assignee} by {author}",
+            "task_details": row['description'],
+            "task_created_by": author,
+            "task_due_date": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "task_asignee_id":assigneeId,
+            "task_author_id":authorId,
+            "task_asignee_name": assignee,
+            "task_author_name": author
+        }
+    }
+    create_task(task_object)
+    return True
+
+def process_row_call(row):
+    mig_id = getRelatedId('tasks','migration_source_id',row['id'])
+    if (mig_id != None):
+        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        return False
+    attendant = get_attendant(row['attendant_type'],row['attendant_id'])
+    if(attendant['lead_id'] == None and attendant['customer_id'] == None):
+        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        return False
+    created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
+    time = time_es_to_utc(row['time'])
+    taskId = getRelatedId('tasks','migration_source_id',row['id'])
+    if taskId:
+        print(f"Task with ID {row['id']} already exists. Skipping")
+        return False
+    authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
+    assigneeId = getRelatedId('users','migration_source_id',row['userID'])
+
+    assignee = get_username(assigneeId)
+    author =get_username(authorId)
+
+    if(assigneeId == None):
+        print(f"no assignee {assigneeId}")
+        return False
+    task_object = {
+        "author_id": authorId,
+        "customer_id":attendant['customer_id'],
+        "lead_id":attendant['lead_id'],
+        "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
+        "task_status_id":getRelatedId('task_statuses','slug',row['status']),
+        "task_category_id":getRelatedId('task_categories','slug','call'),
+        "task_priority_id":"2",
+        "due_date":time.strftime('%Y-%m-%d'),
+        "due_time":time.strftime('%H:%M:%S'),
+        "date_accepted":None,
+        "details": row['description'],
+        "location":None,
+        "is_automated":"1",
+        "deleted_at":None,
+        "created_at": created_date,
+        "updated_at":created_date,
+        "parent_id":None,
+        "migration_source_id": row['id'],
+        "attendant": attendant,
+        "event_title": "task_call_created",
+        "event": {
+            "task_category": "Call",
+            "task_priority": "Normal",
+            "task_status": row["status"].capitalize(),
+            "task_assignee_text": f"Assigned to {assignee} by {author}",
+            "task_details": row['description'],
+            "task_created_by": author,
+            "task_due_date": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "task_asignee_id":assigneeId,
+            "task_author_id":authorId,
+            "task_asignee_name": assignee,
+            "task_author_name": author
+        }
+    }
+    create_task(task_object)
+    return True
+
+def process_row_callback(row):
+    mig_id = getRelatedId('tasks','migration_source_id',row['id'])
+    if (mig_id != None):
+        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        return False
+    attendant = get_attendant(row['attendant_type'],row['attendant_id'])
+    if(attendant['lead_id'] == None and attendant['customer_id'] == None):
+        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        return False
+    created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
+    time = time_es_to_utc(row['time'])
+    taskId = getRelatedId('tasks','migration_source_id',row['id'])
+    if taskId:
+        print(f"Task with ID {row['id']} already exists. Skipping")
+        return False
+    authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
+    assigneeId = getRelatedId('users','migration_source_id',row['userID'])
+
+    assignee = get_username(assigneeId)
+    author =get_username(authorId)
+
+    if(assigneeId == None):
+        print(f"no assignee {assigneeId}")
+        return False
+    task_object = {
+        "author_id": authorId,
+        "customer_id":attendant['customer_id'],
+        "lead_id":attendant['lead_id'],
+        "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
+        "task_status_id":getRelatedId('task_statuses','slug',row['status']),
+        "task_category_id":getRelatedId('task_categories','slug','callback'),
+        "task_priority_id":"2",
+        "due_date":time.strftime('%Y-%m-%d'),
+        "due_time":time.strftime('%H:%M:%S'),
+        "date_accepted":None,
+        "details": row['description'],
+        "location":None,
+        "is_automated":"1",
+        "deleted_at":None,
+        "created_at": created_date,
+        "updated_at":created_date,
+        "parent_id":None,
+        "migration_source_id": row['id'],
+        "attendant": attendant,
+        "event_title": "task_callback_created",
+        "event": {
+            "task_category": "Callback",
+            "task_priority": "Normal",
+            "task_status": row["status"].capitalize(),
+            "task_assignee_text": f"Assigned to {assignee} by {author}",
+            "task_details": row['description'],
+            "task_created_by": author,
+            "task_due_date": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "task_asignee_id":assigneeId,
+            "task_author_id":authorId,
+            "task_asignee_name": assignee,
+            "task_author_name": author
+        }
+    }
+    create_task(task_object)
+    return True
+
+def process_row_reminder(row):
+    mig_id = getRelatedId('tasks','migration_source_id',row['id'])
+    if (mig_id != None):
+        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        return False
+    attendant = get_attendant(row['attendant_type'],row['attendant_id'])
+    if(attendant['lead_id'] == None and attendant['customer_id'] == None):
+        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        return False
+    created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
+    time = time_es_to_utc(row['time'])
+    taskId = getRelatedId('tasks','migration_source_id',row['id'])
+    if taskId:
+        print(f"Task with ID {row['id']} already exists. Skipping")
+        return False
+    authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
+    assigneeId = getRelatedId('users','migration_source_id',row['userID'])
+
+    assignee = get_username(assigneeId)
+    author =get_username(authorId)
+
+    if(assigneeId == None):
+        print(f"no assignee {assigneeId}")
+        return False
+    task_object = {
+        "author_id": authorId,
+        "customer_id":attendant['customer_id'],
+        "lead_id":attendant['lead_id'],
+        "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
+        "task_status_id":getRelatedId('task_statuses','slug',row['status']),
+        "task_category_id":getRelatedId('task_categories','slug','reminder'),
+        "task_priority_id":"2",
+        "due_date":time.strftime('%Y-%m-%d'),
+        "due_time":time.strftime('%H:%M:%S'),
+        "date_accepted":None,
+        "details": row['description'],
+        "location":None,
+        "is_automated":"1",
+        "deleted_at":None,
+        "created_at": created_date,
+        "updated_at":created_date,
+        "parent_id":None,
+        "migration_source_id": row['id'],
+        "attendant": attendant,
+        "event_title": "task_reminder_created",
+        "event": {
+            "task_category": "Reminder",
+            "task_priority": "Normal",
+            "task_status": row["status"].capitalize(),
+            "task_assignee_text": f"Assigned to {assignee} by {author}",
+            "task_details": row['description'],
+            "task_created_by": author,
+            "task_due_date": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "task_asignee_id":assigneeId,
+            "task_author_id":authorId,
+            "task_asignee_name": assignee,
+            "task_author_name": author
+        }
+    }
+    create_task(task_object)
+    return True
+
+def process_row_appointment(row):
+    mig_id = getRelatedId('tasks','migration_source_id',row['id'])
+    if (mig_id != None):
+        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        return False
+    attendant = get_attendant(row['attendant_type'],row['attendant_id'])
+    if(attendant['lead_id'] == None and attendant['customer_id'] == None):
+        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        return False
+    created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
+    time = time_es_to_utc(row['time'])
+    taskId = getRelatedId('tasks','migration_source_id',row['id'])
+    if taskId:
+        print(f"Task with ID {row['id']} already exists. Skipping")
+        return False
+    authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
+    assigneeId = getRelatedId('users','migration_source_id',row['userID'])
+
+    assignee = get_username(assigneeId)
+    author =get_username(authorId)
+
+    if(assigneeId == None):
+        print(f"no assignee {assigneeId}")
+        return False
+    task_object = {
+        "author_id": authorId,
+        "customer_id":attendant['customer_id'],
+        "lead_id":attendant['lead_id'],
+        "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
+        "task_status_id":getRelatedId('task_statuses','slug',row['status']),
+        "task_category_id":getRelatedId('task_categories','slug','reminder'),
+        "task_priority_id":"2",
+        "due_date":time.strftime('%Y-%m-%d'),
+        "due_time":time.strftime('%H:%M:%S'),
+        "date_accepted":None,
+        "details": row['description'],
+        "location":None,
+        "is_automated":"1",
+        "deleted_at":None,
+        "created_at": created_date,
+        "updated_at":created_date,
+        "parent_id":None,
+        "migration_source_id": row['id'],
+        "attendant": attendant,
+        "event_title": "task_reminder_created",
+        "event": {
+            "task_category": "Reminder",
+            "task_priority": "Normal",
+            "task_status": row["status"].capitalize(),
+            "task_assignee_text": f"Assigned to {assignee} by {author}",
+            "task_details": row['description'],
+            "task_created_by": author,
+            "task_due_date": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "task_asignee_id":assigneeId,
+            "task_author_id":authorId,
+            "task_asignee_name": assignee,
+            "task_author_name": author
+        }
+    }
+    create_task(task_object)
+    return True
 
 def create_task(task_object):
     insert_query = """
@@ -236,10 +562,21 @@ def get_attendant(attendant_type, id):
 
 def get_source_csv():
     match task_type:
-        case "other":
-            return "files/others.csv"
         case "todo":
             return "files/to_do.csv"
+        case "phone_call":
+            return "files/phone_call.csv"
+        case "call":
+            return "files/call.csv"
+        case "callback":
+            return "files/callback.csv"
+        case "appointment":
+            return "files/appointment.csv"
+        case "reminder":
+            return "files/reminder.csv"
+        case "other":
+            return "files/other.csv"
+            
 
 def read_csv():
     source_csv = get_source_csv()

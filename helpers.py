@@ -84,6 +84,8 @@ def createUser(name,email,migration_source_id,firstname,lastname):
     conn.commit()
 
 def get_username(id):
+    if(id == None):
+        return None
     query = sql.SQL(f"SELECT name FROM users WHERE id = {id}")
     cursor.execute(query)
     result = cursor.fetchone()
@@ -94,6 +96,8 @@ def getRelatedId(table, column, value):
     """
     Fetch the related ID from a given table and column, or return None if not found.
     """
+    if(value == None or value == ''):
+        return None
     query = sql.SQL("SELECT id FROM {table} WHERE {column} = %s").format(
         table=sql.Identifier(table),
         column=sql.Identifier(column)
