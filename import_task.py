@@ -2,13 +2,15 @@ import csv
 import os
 from  helpers import *
 from multiprocessing import Pool
-task_type = 'other'
+task_type = 'todo'
 
 
 def process_row(row):
     match task_type:
         case 'other':
             return process_row_other(row)
+        case 'todo':
+            return process_row_todo(row)
         case _:
             print(f"Invalid task_type '{task_type}'")
             
@@ -79,7 +81,71 @@ def process_row_other(row):
     
     return True
 
+def process_row_todo(row):
+    mig_id = getRelatedId('tasks','migration_source_id',row['id'])
+    if (mig_id != None):
+        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        return False
+    attendant = get_attendant(row['attendant_type'],row['attendant_id'])
+    if(attendant['lead_id'] == None and attendant['customer_id'] == None):
+        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        return False
+    created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
+    time = time_es_to_utc(row['time'])
+    taskId = getRelatedId('tasks','migration_source_id',row['id'])
+    if taskId:
+        print(f"Task with ID {row['id']} already exists. Skipping")
+        return False
+    authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
+    assigneeId = getRelatedId('users','migration_source_id',row['userID'])
+
+    assignee = get_username(assigneeId)
+    author =get_username(authorId)
+
+    if(assigneeId == None):
+        print(f"no assignee {assigneeId}")
+        return False
+    task_object = {
+        "author_id": authorId,
+        "customer_id":attendant['customer_id'],
+        "lead_id":attendant['lead_id'],
+        "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
+        "task_status_id":getRelatedId('task_statuses','slug',row['status']),
+        "task_category_id":getRelatedId('task_categories','slug','other'),
+        "task_priority_id":"2",
+        "due_date":time.strftime('%Y-%m-%d'),
+        "due_time":time.strftime('%H:%M:%S'),
+        "date_accepted":None,
+        "details": row['description'],
+        "location":None,
+        "is_automated":"1",
+        "deleted_at":None,
+        "created_at": created_date,
+        "updated_at":created_date,
+        "parent_id":None,
+        "migration_source_id": row['id'],
+        "attendant": attendant,
+        "event_title": "task_created",
+        "event": {
+            "task_category": "Task",
+            "task_priority": "Normal",
+            "task_status": "Assigned",
+            "task_assignee_text": f"Assigned to {assignee} by {author}",
+            "task_details": row['description'],
+            "task_created_by": author,
+            "task_due_date": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "task_asignee_id":assigneeId,
+            "task_author_id":authorId,
+            "task_asignee_name": assignee,
+            "task_author_name": author
+        }
+    }
+    create_task(task_object)
+
+
     
+    return True
+
 
 def create_task(task_object):
     insert_query = """
@@ -162,16 +228,21 @@ def get_attendant(attendant_type, id):
             attendant['attendant_id'] = attendant_id
             attendant['attendant_type'] = 'lead'
         case "customer":
-            attendant_id = getRelatedId('customers  ','migration_source_id',id)
+            attendant_id = getRelatedId('customers','migration_source_id',id)
             attendant['customer_id'] = attendant_id
             attendant['attendant_id'] = attendant_id
             attendant['attendant_type'] = 'customer'
     return attendant
 
-
+def get_source_csv():
+    match task_type:
+        case "other":
+            return "files/others.csv"
+        case "todo":
+            return "files/to_do.csv"
 
 def read_csv():
-    source_csv = 'files/other.csv'
+    source_csv = get_source_csv()
     i = 0
     with open(source_csv, mode='r', newline='', encoding='utf-8') as file:
         reader = csv.DictReader(file)
