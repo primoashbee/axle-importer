@@ -99,6 +99,8 @@ def getRelatedId(table, column, value):
 
 
 def add_dashes(phone_number):
+    if phone_number is None:
+        return None
     # Add dashes to phone numbers for formatting (e.g., 1234567890 -> 123-456-7890)
     return f"{phone_number[:3]}-{phone_number[3:6]}-{phone_number[6:]}"
 # createEventLog("lead", 99999, "event", "logData", "2025-01-09 16:03:13")

@@ -1,2 +1,3 @@
 *.zip
 files/*
+.DS_Store
