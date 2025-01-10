@@ -1,7 +1,8 @@
 import json
 import psycopg2
 from psycopg2 import sql
-
+import datetime
+import pytz
 conn = psycopg2.connect(
     dbname="prod_v3_backup",
     user="postgres",
@@ -50,7 +51,6 @@ def createEventLog(loggable, loggableId, event, logData, createdAt):
         %s, %s, %s, %s
     )
     """
-
     cursor.execute(insert_query, (
         data["user_type"], data["user_id"], data["event"], data["auditable_type"], data["auditable_id"],
         data["old_values"], data["new_values"], data["url"], data["ip_address"], data["user_agent"],
@@ -104,3 +104,13 @@ def add_dashes(phone_number):
     # Add dashes to phone numbers for formatting (e.g., 1234567890 -> 123-456-7890)
     return f"{phone_number[:3]}-{phone_number[3:6]}-{phone_number[6:]}"
 # createEventLog("lead", 99999, "event", "logData", "2025-01-09 16:03:13")
+
+def time_es_to_utc(datestring):
+    if(datestring == '0000-00-00 00:00:00' or datestring == ''):
+        print(f'weird datestring found {datestring}')
+        datestring = '1990-01-01 00:00:00'
+    d = datetime.datetime.strptime(datestring,'%Y-%m-%d %H:%M:%S')
+    pst = pytz.timezone("US/Eastern")
+    esdate = pst.localize(d)
+    utcdate = esdate.astimezone(pytz.utc)
+    return utcdate
