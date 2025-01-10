@@ -125,7 +125,7 @@ def process_row_todo(row):
         "parent_id":None,
         "migration_source_id": row['id'],
         "attendant": attendant,
-        "event_title": "task_created",
+        "event_title": "task_todo_created",
         "event": {
             "task_category": "Task",
             "task_priority": "Normal",
