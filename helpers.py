@@ -155,3 +155,9 @@ def time_es_to_utc(datestring):
     esdate = pst.localize(d)
     utcdate = esdate.astimezone(pytz.utc)
     return utcdate
+
+def blank_to_none(str):
+    if str == "":
+        return None
+    
+    return str
