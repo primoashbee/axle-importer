@@ -3,6 +3,8 @@ import psycopg2
 from psycopg2 import sql
 import datetime
 import pytz
+import re
+
 conn = psycopg2.connect(
     dbname="prod_v3_backup",
     user="postgres",
@@ -89,7 +91,6 @@ def get_username(id):
     query = sql.SQL(f"SELECT name FROM users WHERE id = {id}")
     cursor.execute(query)
     result = cursor.fetchone()
-    print(result)
     return result[0] if result else None
 
 def getRelatedId(table, column, value):
@@ -98,16 +99,45 @@ def getRelatedId(table, column, value):
     """
     if(value == None or value == ''):
         return None
-    query = sql.SQL("SELECT id FROM {table} WHERE {column} = %s").format(
+    
+    query = sql.SQL("SELECT id FROM {table} WHERE {column} = %s order by id DESC").format(
         table=sql.Identifier(table),
         column=sql.Identifier(column)
     )
     cursor.execute(query, (value,))
+    
     result = cursor.fetchone()
+    # if(result == None):
+    #     print(cursor.mogrify(query.as_string(cursor), (value,)).decode("utf-8"))
+
     return result[0] if result else None
 
+def sluggify(string):
+    text = string.lower()
+    text = re.sub(r'[^a-z0-9\s]', '', text)
+    text = re.sub(r'\s+', '-', text)
+    return text.strip('-')
 
+def createSource(sourceObject):
+    insert_query="""
+    INSERT into sources (name, slug, type, active)
+    VALUES (
+        %s,
+        %s,
+        %s,
+        %s
+    )
+    returning id
+    """
+    cursor.execute(insert_query,(
+        sourceObject['name'],
+        sourceObject['slug'],
+        sourceObject['type'],
+        sourceObject['active'],
+    ))
 
+    conn.commit()
+    return cursor.fetchone()[0]
 
 def add_dashes(phone_number):
     if phone_number is None:

@@ -78,7 +78,6 @@ def getLeadStatus(status):
 def createLeadStatus(status):
     
     insert_query = "INSERT INTO lead_statuses name VALUES (%s)"
-    print(cursor.mogrify(insert_query, (status,)).decode('utf-8'))
     cursor.execute(insert_query, ((status),))  # Note the comma after `status` to make it a tuple
     conn.commit()
     return cursor.lastrowid

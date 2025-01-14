@@ -9,9 +9,9 @@ Call ❓
 Callback ✅
 Appointment ⚙️
 Reminder ✅
-Other 🟢
+Other ✅
 """
-task_type = 'other'
+task_type = 'appointment'
 
 
 def process_row(row):
@@ -25,7 +25,7 @@ def process_row(row):
         case 'callback':
             return process_row_callback(row)
         case 'appointment':
-            print("Waiting")
+            return process_row_appointment(row)
         case 'reminder':
             return process_row_reminder(row)
         case 'other':
@@ -349,7 +349,7 @@ def process_row_callback(row):
     create_task(task_object)
     return True
 
-def process_row_reminder(row):
+def process_row_appointment(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
         print(f"Task with migration source id {row["id"]} exists. Skipping.")
@@ -378,8 +378,8 @@ def process_row_reminder(row):
         "customer_id":attendant['customer_id'],
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
-        "task_status_id":getRelatedId('task_statuses','slug',row['status']),
-        "task_category_id":getRelatedId('task_categories','slug','reminder'),
+        "task_status_id":getRelatedId('task_statuses','slug',row['status'].lower()),
+        "task_category_id":getRelatedId('task_categories','slug','appointment'),
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -393,9 +393,9 @@ def process_row_reminder(row):
         "parent_id":None,
         "migration_source_id": row['id'],
         "attendant": attendant,
-        "event_title": "task_reminder_created",
+        "event_title": "task_appointment_created",
         "event": {
-            "task_category": "Reminder",
+            "task_category": "Scheduled",
             "task_priority": "Normal",
             "task_status": row["status"].capitalize(),
             "task_assignee_text": f"Assigned to {assignee} by {author}",
@@ -408,10 +408,38 @@ def process_row_reminder(row):
             "task_author_name": author
         }
     }
-    create_task(task_object)
+
+    appointment_object = {
+        "customer_id" : attendant['customer_id'],
+        "appointment_date" : time.strftime('%Y-%m-%d'),
+        "appointment_time" : time.strftime('%H:%M:%S'),
+        "description": row["description"],
+        "created_at": created_date,
+        "updated_at": created_date,
+        "user_id" : authorId,
+        "lead_id" : attendant["lead_id"],
+        "attendant" : attendant,
+        "event_title": "task_appointment_created",
+        "event": {
+            "task_category": "Scheduled",
+            "task_priority": "Normal",
+            "task_status": row["status"].capitalize(),
+            "task_assignee_text": f"Assigned to {assignee} by {author}",
+            "task_details": row['description'],
+            "task_created_by": author,
+            "task_due_date": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "task_asignee_id":assigneeId,
+            "task_author_id":authorId,
+            "task_asignee_name": assignee,
+            "task_author_name": author
+        }
+    }
+    taskId = create_task(task_object)
+    appointmentId= create_appointment(appointment_object)
+    taskAppointmentId = create_task_appointment(taskId, appointmentId)
     return True
 
-def process_row_appointment(row):
+def process_row_reminder(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
         print(f"Task with migration source id {row["id"]} exists. Skipping.")
@@ -540,6 +568,43 @@ def create_task(task_object):
     return task_id
 
 
+def create_appointment(appointment_object):
+    insert_query="""
+    INSERT INTO appointments (
+        customer_id,
+        appointment_date,
+        appointment_time,
+        description,
+        created_at,
+        updated_at,
+        user_id,
+        lead_id
+    ) VALUES (
+        %s,
+        %s,
+        %s,
+        %s,
+        %s,
+        %s,
+        %s,
+        %s
+    )
+    returning id
+    """    
+
+    cursor.execute(insert_query, (
+        appointment_object['customer_id'],
+        appointment_object['appointment_date'],
+        appointment_object['appointment_time'],
+        appointment_object['description'],
+        appointment_object['created_at'],
+        appointment_object['updated_at'],
+        appointment_object['user_id'],
+        appointment_object['lead_id'],
+    ))
+    conn.commit()
+    appointment_id = cursor.fetchone()[0];
+    return appointment_id
 
 def get_attendant(attendant_type, id):
     attendant = {
@@ -559,6 +624,26 @@ def get_attendant(attendant_type, id):
             attendant['attendant_id'] = attendant_id
             attendant['attendant_type'] = 'customer'
     return attendant
+
+
+def create_task_appointment(taskId, appointmentId):
+    insert_query  = """
+    INSERT INTO task_appointments (
+        task_id,
+        appointment_id
+    ) VALUES (
+        %s,
+        %s
+    )
+    returning id
+    """
+    cursor.execute(insert_query, (
+        taskId,
+        appointmentId
+    ))
+    conn.commit()
+    taskAppointmentId = cursor.fetchone()[0];
+    return taskAppointmentId
 
 def get_source_csv():
     match task_type:
