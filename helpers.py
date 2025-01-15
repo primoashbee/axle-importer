@@ -1,6 +1,9 @@
 import json
 import psycopg2
 from psycopg2 import sql
+from datetime import datetime
+import pytz
+import re
 
 conn = psycopg2.connect(
     dbname="prod_v3_backup",
@@ -50,7 +53,6 @@ def createEventLog(loggable, loggableId, event, logData, createdAt):
         %s, %s, %s, %s
     )
     """
-
     cursor.execute(insert_query, (
         data["user_type"], data["user_id"], data["event"], data["auditable_type"], data["auditable_id"],
         data["old_values"], data["new_values"], data["url"], data["ip_address"], data["user_agent"],
@@ -83,20 +85,59 @@ def createUser(name,email,migration_source_id,firstname,lastname):
 
     conn.commit()
 
+def get_username(id):
+    if(id == None):
+        return None
+    query = sql.SQL(f"SELECT name FROM users WHERE id = {id}")
+    cursor.execute(query)
+    result = cursor.fetchone()
+    return result[0] if result else None
+
 def getRelatedId(table, column, value):
     """
     Fetch the related ID from a given table and column, or return None if not found.
     """
-    query = sql.SQL("SELECT id FROM {table} WHERE {column} = %s").format(
+    if(value == None or value == ''):
+        return None
+    
+    query = sql.SQL("SELECT id FROM {table} WHERE {column} = %s order by id DESC").format(
         table=sql.Identifier(table),
         column=sql.Identifier(column)
     )
     cursor.execute(query, (value,))
+    
     result = cursor.fetchone()
+    # if(result == None):
+    #     print(cursor.mogrify(query.as_string(cursor), (value,)).decode("utf-8"))
+
     return result[0] if result else None
 
+def sluggify(string):
+    text = string.lower()
+    text = re.sub(r'[^a-z0-9\s]', '', text)
+    text = re.sub(r'\s+', '-', text)
+    return text.strip('-')
 
+def createSource(sourceObject):
+    insert_query="""
+    INSERT into sources (name, slug, type, active)
+    VALUES (
+        %s,
+        %s,
+        %s,
+        %s
+    )
+    returning id
+    """
+    cursor.execute(insert_query,(
+        sourceObject['name'],
+        sourceObject['slug'],
+        sourceObject['type'],
+        sourceObject['active'],
+    ))
 
+    conn.commit()
+    return cursor.fetchone()[0]
 
 def add_dashes(phone_number):
     if phone_number is None:
@@ -104,3 +145,34 @@ def add_dashes(phone_number):
     # Add dashes to phone numbers for formatting (e.g., 1234567890 -> 123-456-7890)
     return f"{phone_number[:3]}-{phone_number[3:6]}-{phone_number[6:]}"
 # createEventLog("lead", 99999, "event", "logData", "2025-01-09 16:03:13")
+
+def time_es_to_utc(datestring):
+    if(datestring == '0000-00-00 00:00:00' or datestring == ''):
+        print(f'weird datestring found {datestring}')
+        datestring = '1990-01-01 00:00:00'
+    d = datetime.strptime(datestring,'%Y-%m-%d %H:%M:%S')
+    pst = pytz.timezone("US/Eastern")
+    esdate = pst.localize(d)
+    utcdate = esdate.astimezone(pytz.utc)
+    return utcdate
+
+def convert_null(value):
+    return None if value == "NULL" else value
+
+def validate_date(string):
+    if not isinstance(string, str) or string in ['0000-00-00', '0000-00-00 00:00:00', '']:
+        return None
+    try:
+        valid_date = datetime.strptime(string, '%Y-%m-%d %H:%M:%S')
+        return valid_date
+    except ValueError:
+        try:
+            valid_date = datetime.strptime(string, '%Y-%m-%d')
+            return valid_date
+        except ValueError:
+            return None
+def blank_to_none(str):
+    if str == "":
+        return None
+    
+    return str
