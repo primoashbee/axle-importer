@@ -171,3 +171,8 @@ def validate_date(string):
             return valid_date
         except ValueError:
             return None
+def blank_to_none(str):
+    if str == "":
+        return None
+    
+    return str
