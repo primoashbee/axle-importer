@@ -1,7 +1,7 @@
 import json
 import psycopg2
 from psycopg2 import sql
-import datetime
+from datetime import datetime
 import pytz
 import re
 
@@ -150,8 +150,24 @@ def time_es_to_utc(datestring):
     if(datestring == '0000-00-00 00:00:00' or datestring == ''):
         print(f'weird datestring found {datestring}')
         datestring = '1990-01-01 00:00:00'
-    d = datetime.datetime.strptime(datestring,'%Y-%m-%d %H:%M:%S')
+    d = datetime.strptime(datestring,'%Y-%m-%d %H:%M:%S')
     pst = pytz.timezone("US/Eastern")
     esdate = pst.localize(d)
     utcdate = esdate.astimezone(pytz.utc)
     return utcdate
+
+def convert_null(value):
+    return None if value == "NULL" else value
+
+def validate_date(string):
+    if not isinstance(string, str) or string in ['0000-00-00', '0000-00-00 00:00:00', '']:
+        return None
+    try:
+        valid_date = datetime.strptime(string, '%Y-%m-%d %H:%M:%S')
+        return valid_date
+    except ValueError:
+        try:
+            valid_date = datetime.strptime(string, '%Y-%m-%d')
+            return valid_date
+        except ValueError:
+            return None

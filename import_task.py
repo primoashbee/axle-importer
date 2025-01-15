@@ -3,15 +3,26 @@ import os
 from  helpers import *
 from multiprocessing import Pool
 """
-To do ✅
-Phone Call ✅ > Create Phone Logs
-Call ❓ 
-Callback ✅
-Appointment ⚙️
-Reminder ✅
-Other ✅
+follow_up
+appointment wip
+reminder ✅
+outreach
+meeting
+to_do ✅
+other ✅
+callback ✅
+contact
+phone_call ✅
+sold_follow_up
+birthday_follow_up
+anniversary_follow_up
+unsold_follow_up
+sold_cadence
+unsold_cadence
+send_email
+place_phone_call
 """
-task_type = 'appointment'
+task_type = 'other'
 
 
 def process_row(row):
@@ -20,7 +31,7 @@ def process_row(row):
             return process_row_todo(row)
         case 'phone_call':
             return process_row_phone_call(row)
-        case 'call':
+        case 'call': #x
             return process_row_call(row)
         case 'callback':
             return process_row_callback(row)
