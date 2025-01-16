@@ -160,7 +160,7 @@ def convert_null(value):
     return None if value == "NULL" else value
 
 def validate_date(string):
-    if not isinstance(string, str) or string in ['0000-00-00', '0000-00-00 00:00:00', '']:
+    if not isinstance(string, str) or string in ['0000-00-00', '0000-00-00 00:00:00', '', 'NULL']:
         return None
     try:
         valid_date = datetime.strptime(string, '%Y-%m-%d %H:%M:%S')

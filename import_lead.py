@@ -18,7 +18,8 @@ def execute():
             leadStatusID = getLeadStatus(row['status']);
 
             if(leadSourceId == None or leadStatusID == None):
-                exit();
+                print(f"Skipping.. {row['leadID']}")
+                return False;
             assigneeId = None
             if row['agentID']:
                 assigneeId = getUserId(row['agentID'], row)

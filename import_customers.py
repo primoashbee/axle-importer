@@ -11,6 +11,8 @@ def process_row(row):
         row['source'] = "Web"
     row['source'] = sluggify(row['source']) + "-customers"
     source_id = getRelatedId("sources","slug", row['source'])
+    if(validate_date(row['createdAt']) == None or validate_date(row['updatedAt']) == None) :
+        return False
     customerObject = {
         "id": customerId,
         "customer_system_id" : str(uuid.uuid4()),
@@ -18,11 +20,11 @@ def process_row(row):
         "middle_name": None,
         "last_name": row['lastName'],
         "email" : row['email'],
-        "birth_date" : row['dateOfBirth'],
+        "birth_date" : validate_date(row['dateOfBirth']),
         "driver_license_id" : row['driverLicenseID'],
         "status": getRelatedId("sources", "slug", row['source']),
-        "created_at" : row['createdAt'],
-        "updated_at" : row['updatedAt'],
+        "created_at" : validate_date(row['createdAt']),
+        "updated_at" : validate_date(row['updatedAt']),
         "source_id"  : source_id,
         "deal_status" : row['status'],
         "migration_source_id": row['customerID'],
@@ -57,7 +59,7 @@ def process_row(row):
         create_customer(customerObject)
     else:
         update_customer(customerObject)
-    # print(customerId);
+    return True
     
 def create_customer(customerObject):
     insert_query = """
@@ -120,6 +122,7 @@ def upsert_contact(contactObject, customerId):
             %s,
             %s
         )
+        RETURNING id
         """
         cursor.execute(insert_query, (
             customerId,
@@ -231,7 +234,7 @@ def update_customer(customerObject):
     addressId = upsert_address(customerObject['address'], customerObject['id'])
     
 def get_source_csv():
-    return "files/customers_test.csv"
+    return "files/customers.csv"
 
 def read_csv():
     source_csv = get_source_csv()
