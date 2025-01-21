@@ -90,8 +90,22 @@ def get_username(id):
         return None
     query = sql.SQL(f"SELECT name FROM users WHERE id = {id}")
     cursor.execute(query)
-    result = cursor.fetchone()
+    result = cursor.fetchall()
     return result[0] if result else None
+
+
+def get_lead_details(id):
+    if(id == None):
+        return None
+    query = sql.SQL(f"SELECT * FROM leads WHERE id = {id}")
+    cursor.execute(query)
+    result = cursor.fetchone()
+    return {
+        "fields":[field[0] for field in cursor.description],
+        "data": result
+    } if result else None
+
+
 
 def getRelatedId(table, column, value):
     """

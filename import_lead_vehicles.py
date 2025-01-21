@@ -9,16 +9,23 @@ def process_row(row):
     lead_id = getRelatedId("leads","id", row['leadID'])
     vehicle_id = get_vehicle_id(row)
     if(lead_id == None or vehicle_id == None):
-        print("no data found")
+        print(f"no data found")
         return False
-    created_at = time_es_to_utc(row['createdAt']) #.strftime('%Y-%m-%d %H:%M:%S')
-    updated_at = time_es_to_utc(row['updatedAt']) #.strftime('%Y-%m-%d %H:%M:%S')
+    created_at = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
+    updated_at = time_es_to_utc(row['updatedAt']).strftime('%Y-%m-%d %H:%M:%S')
 
     create_lead_vehicle({
         "lead_id": lead_id,
         "vehicle_id": vehicle_id,
         "created_at": created_at,
-        "updated_at": updated_at
+        "updated_at": updated_at,
+        "event_title": "lead-vehicle-created",
+        "event":{
+            "vehicle_id": vehicle_id,
+            "lead_id": lead_id,
+            "created_at": created_at,
+            "updated_at": updated_at
+        }
     })
 
     return True
@@ -29,9 +36,10 @@ def read_csv():
     with open(source_csv, mode='r', newline='', encoding='utf-8') as file:
         reader = csv.DictReader(file)
         # for row in reader:
-        #     process_row(row)
-        #     i = i + 1
-        #     if i > 10:
+        #     res = process_row(row)
+        #     if(res):
+        #         i = i + 1
+        #     if i > 5:
         #         break
         with Pool(processes=10) as pool:
             result =pool.map(process_row, reader)            
@@ -58,6 +66,9 @@ def create_lead_vehicle(data):
     """
     cursor.execute(sql, [data['lead_id'], data['vehicle_id'],data['created_at'],data['updated_at']])
     id = cursor.fetchone()
+    data["event"]["id"] = id[0]
+    print(f"data {data}")
+    createEventLog("lead", data['lead_id'], data['event_title'], data['event'], data['created_at'])
 
 if __name__ == "__main__":
     os.system('cls' if os.name == 'nt' else 'clear')
