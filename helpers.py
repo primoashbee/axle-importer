@@ -176,3 +176,22 @@ def blank_to_none(str):
         return None
     
     return str
+
+def get_attendant(attendant_type, id):
+    attendant = {
+        'lead_id': None,
+        'customer_id': None,
+        'attendant_type': "",
+    }
+    match attendant_type:
+        case "lead":
+            attendant_id = getRelatedId('leads','migration_source_id',id)
+            attendant['lead_id'] = attendant_id
+            attendant['attendant_id'] = attendant_id
+            attendant['attendant_type'] = 'lead'
+        case "customer":
+            attendant_id = getRelatedId('customers','migration_source_id',id)
+            attendant['customer_id'] = attendant_id
+            attendant['attendant_id'] = attendant_id
+            attendant['attendant_type'] = 'customer'
+    return attendant
