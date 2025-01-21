@@ -174,7 +174,7 @@ def convert_null(value):
     return None if value == "NULL" else value
 
 def validate_date(string):
-    if not isinstance(string, str) or string in ['0000-00-00', '0000-00-00 00:00:00', '']:
+    if not isinstance(string, str) or string in ['0000-00-00', '0000-00-00 00:00:00', '', 'NULL']:
         return None
     try:
         valid_date = datetime.strptime(string, '%Y-%m-%d %H:%M:%S')
@@ -190,3 +190,22 @@ def blank_to_none(str):
         return None
     
     return str
+
+def get_attendant(attendant_type, id):
+    attendant = {
+        'lead_id': None,
+        'customer_id': None,
+        'attendant_type': "",
+    }
+    match attendant_type:
+        case "lead":
+            attendant_id = getRelatedId('leads','migration_source_id',id)
+            attendant['lead_id'] = attendant_id
+            attendant['attendant_id'] = attendant_id
+            attendant['attendant_type'] = 'lead'
+        case "customer":
+            attendant_id = getRelatedId('customers','migration_source_id',id)
+            attendant['customer_id'] = attendant_id
+            attendant['attendant_id'] = attendant_id
+            attendant['attendant_type'] = 'customer'
+    return attendant

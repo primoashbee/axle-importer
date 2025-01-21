@@ -4,10 +4,11 @@ from psycopg2 import sql
 from datetime import datetime
 import json
 from helpers import createEventLog, cursor, conn, getRelatedId, add_dashes
-
+import os
+from multiprocessing import Pool
 
 def execute():
-    source_csv = "files/lead_view_no_info.csv"
+    source_csv = "files/leads.csv"
     with open(source_csv, mode='r', newline='', encoding='utf-8') as file:
         reader = csv.DictReader(file)
 
@@ -18,7 +19,8 @@ def execute():
             leadStatusID = getLeadStatus(row['status']);
 
             if(leadSourceId == None or leadStatusID == None):
-                exit();
+                print(f"Skipping.. {row['leadID']}")
+                return False;
             assigneeId = None
             if row['agentID']:
                 assigneeId = getUserId(row['agentID'], row)
@@ -46,6 +48,43 @@ def execute():
     # cursor.close()
     # conn.close()
         
+def process_row(row):
+    
+    row = {key: (None if value == 'NULL' else value) for key, value in row.items()}
+    migId = getRelatedId("phone_number_call_logs", "migration_source_id", row['leadID'])
+    if(migId):
+        print(f"Skipping.. {row['leadID']}")
+        return False
+    is_internet = True if row['sourceType'] == 'Internet' else False
+    
+    leadSourceId = getLeadSourceId(row['sourceName'], is_internet);
+    leadStatusID = getLeadStatus(row['status']);
+
+    if(leadSourceId == None or leadStatusID == None):
+        print(f"Skipping.. {row['leadID']}")
+        return False;
+    assigneeId = None
+    if row['agentID']:
+        assigneeId = getUserId(row['agentID'], row)
+
+    leadData = {
+        "first_name": row['firstName'],
+        "last_name": row['lastName'],
+        "phone_number": add_dashes(row["phone"]),
+        "email": row['email'],
+        "lead_source_id": leadSourceId,
+        "lead_status_id": leadStatusID,
+        "middle_intial": row['middleInitial'],
+        "migration_source_id": row['leadID'],
+        "assignee_id": assigneeId,
+        "created_at": row["createdAt"],
+        "updated_at": row["updatedAt"],
+        "rowData": row
+    }
+    
+    getLeadId(row['leadID'], leadData)
+    print(f"Imported {row['leadID']}")
+    return True
 def getLeadSourceId(source, is_internet):
     query = "SELECT id FROM lead_sources WHERE name = %s"
     cursor.execute(query, (source,))
@@ -133,4 +172,24 @@ def getLeadId(migration_source_id, data):
     result = cursor.fetchone()
     return result[0] if result else createLead(data)
 
-execute();
+
+def read_csv():
+    source_csv = "files/leads.csv"
+    i = 0
+    with open(source_csv, mode='r', newline='', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        with Pool(processes=10) as pool:
+            result =pool.map(process_row, reader)
+            
+            succeeded = len([item for item in result if item == True])
+            print(f'{succeeded} of {len(result)} imported')
+
+
+if __name__ == "__main__":
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print('Starting process')
+    read_csv()
+        
+
+
+# execute();
