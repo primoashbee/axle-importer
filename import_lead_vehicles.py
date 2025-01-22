@@ -6,6 +6,8 @@ from multiprocessing import Pool
 
 
 def process_row(row):
+    if(row['leadID'] == None):
+        return False
     lead_id = getRelatedId("leads","id", row['leadID'])
     vehicle_id = get_vehicle_id(row)
     if(lead_id == None or vehicle_id == None):
