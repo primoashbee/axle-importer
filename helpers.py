@@ -126,6 +126,22 @@ def getRelatedId(table, column, value):
 
     return result[0] if result else None
 
+def get_user_id_by_email(value):
+    """
+    Fetch the related ID from a given table and column, or return None if not found.
+    """
+    if(value == None or value == ''):
+        return None
+    
+    query = "SELECT id FROM users WHERE email = %s order by id DESC"
+    cursor.execute(query, (value,))
+    
+    result = cursor.fetchone()
+    # if(result == None):
+    #     print(cursor.mogrify(query.as_string(cursor), (value,)).decode("utf-8"))
+
+    return result[0] if result else None
+
 def sluggify(string):
     text = string.lower()
     text = re.sub(r'[^a-z0-9\s]', '', text)
@@ -156,6 +172,12 @@ def createSource(sourceObject):
 def add_dashes(phone_number):
     if phone_number is None:
         return None
+    if phone_number == "":
+        return None
+    if phone_number == "NULL":
+        return None
+    phone_number = phone_number.replace("-", "")
+
     # Add dashes to phone numbers for formatting (e.g., 1234567890 -> 123-456-7890)
     return f"{phone_number[:3]}-{phone_number[3:6]}-{phone_number[6:]}"
 # createEventLog("lead", 99999, "event", "logData", "2025-01-09 16:03:13")

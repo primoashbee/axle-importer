@@ -100,7 +100,8 @@ def create_phone_call(row):
             "call_status" : "completed",
             "caller_name" : callerName,
             "caller_id" : callerUserId,
-            "disposition": disposition
+            "disposition": disposition,
+            "disposition_text": row['description']
         }
     }
 
