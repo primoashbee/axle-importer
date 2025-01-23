@@ -93,6 +93,22 @@ def get_username(id):
     result = cursor.fetchall()
     return result[0] if result else None
 
+def get_customer_name(id):
+    if(id == None):
+        return None
+    query = sql.SQL(f"select concat(first_name,' ', last_name) as full_name from customers WHERE id = {id}")
+    cursor.execute(query)
+    result = cursor.fetchall()
+    return result[0] if result else None
+
+def get_customer_email(id):
+    if(id == None):
+        return None
+    query = sql.SQL(f"select email from customers WHERE id = {id}")
+    cursor.execute(query)
+    result = cursor.fetchall()
+    return result[0] if result else None
+
 
 def get_lead_details(id):
     if(id == None):
@@ -200,7 +216,7 @@ def validate_date(string):
         return None
     try:
         valid_date = datetime.strptime(string, '%Y-%m-%d %H:%M:%S')
-        return valid_date
+        return time_es_to_utc(valid_date)
     except ValueError:
         try:
             valid_date = datetime.strptime(string, '%Y-%m-%d')

@@ -3,7 +3,7 @@ import psycopg2
 from psycopg2 import sql
 from datetime import datetime
 import json
-from helpers import createEventLog, cursor, conn, getRelatedId, add_dashes
+from helpers import createEventLog, cursor, conn, getRelatedId, add_dashes, time_es_to_utc
 import os
 from multiprocessing import Pool
 
@@ -35,8 +35,8 @@ def execute():
                 "middle_intial": row['middleInitial'],
                 "migration_source_id": row['leadID'],
                 "assignee_id": assigneeId,
-                "created_at": row["createdAt"],
-                "updated_at": row["updatedAt"],
+                "created_at": time_es_to_utc(row["createdAt"]),
+                "updated_at": time_es_to_utc(row["updatedAt"]),
                 "rowData": row
             }
             
@@ -77,8 +77,8 @@ def process_row(row):
         "middle_intial": row['middleInitial'],
         "migration_source_id": row['leadID'],
         "assignee_id": assigneeId,
-        "created_at": row["createdAt"],
-        "updated_at": row["updatedAt"],
+        "created_at": time_es_to_utc(row["createdAt"]),
+        "updated_at": time_es_to_utc(row["updatedAt"]),
         "rowData": row
     }
     
