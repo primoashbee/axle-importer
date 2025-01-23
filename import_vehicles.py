@@ -5,6 +5,8 @@ from multiprocessing import Pool
 
 
 def process_row(row):
+    # row = {key: (None if value == 'NULL' else value) for key, value in row.items()}
+
     mig_id = getRelatedId('vehicles','migration_source_id',row['vehicleID'])
     if (mig_id != None):
         print(f"Vehicle with migration source id {row["vehicleID"]} exists. Skipping.")
@@ -13,6 +15,10 @@ def process_row(row):
     created_at = time_es_to_utc(row['createdAt']) #.strftime('%Y-%m-%d %H:%M:%S')
     updated_at = time_es_to_utc(row['updatedAt']) #.strftime('%Y-%m-%d %H:%M:%S')
     make_id = get_or_create_make(row['make'],created_at,updated_at)
+        # Check if model is not null or empty
+    # if not row['model']:
+    #     print(f"Model is missing for vehicle ID {row['vehicleID']}. Skipping.")
+    #     return False
     model_id = get_or_create_model(row['model'], make_id,created_at,updated_at)
     type_id = get_or_create_type(row['classification'],created_at,updated_at)
 
