@@ -6,6 +6,8 @@ import sys
 import uuid
 import json
 import logging
+from tqdm import tqdm
+
 
 csv.field_size_limit(sys.maxsize)
 
@@ -24,14 +26,15 @@ def process_row(row):
     
     recipient = row['recipient']
     if( recipient == 'lead' and row_type == 'text'):
-        
         return create_lead_sms(row)
     
     return False
     if( recipient == 'lead' and row_type == 'mail'):
+        return False
         return create_lead_email(row)
     
     if( recipient == 'customer' and row_type == 'mail'):
+        return False
         return create_customer_email(row)
     
     if( recipient == 'customer' and row_type == 'text'):
@@ -40,11 +43,37 @@ def process_row(row):
 
 def create_lead_sms(row):
     sentBy = get_user_id_by_email(row['from'])
+    userName = get_username(sentBy)
+    leadId = getRelatedId('leads','migration_source_id',row['recipientID'])
 
     if(sentBy == None):
         sentBy = getRelatedId('users','personal_phone_number',row['from']) or 2
+    
+    if(leadId == None):
+        return False
 
+    migId = getRelatedId('phone_number_sms_logs','migration_source_id',row['messageID'])
 
+    if(migId != None):
+        
+        update_query="""
+            UPDATE phone_number_sms_logs SET
+            "from" = %s,
+            "to" = %s
+            where migration_source_id = %s
+        """
+
+        cursor.execute(update_query, (
+            add_dashes(row['from']),
+            add_dashes(row['to']),
+            row['messageID']
+        ))
+
+        
+        conn.commit()
+        # print(f"Updated {row['messageID']}")
+        return True
+    
     phoneNumberSmsLogObject = { 
         "from": add_dashes(row['from']),
         "to": add_dashes(row['to']),
@@ -52,14 +81,64 @@ def create_lead_sms(row):
         "is_inbound": False,
         "provider_message_id": str(uuid.uuid4()),
         "provider_response": json.dumps(row),
-        "occured_at": time_es_to_utc(row['createdAt']),
+        "occurred_at": time_es_to_utc(row['createdAt']),
         "created_at": time_es_to_utc(row['createdAt']),
         "updated_at": time_es_to_utc(row['updatedAt']),
         "status" : row['status'],
-        "sent_by": sentBy
+        "sent_by": sentBy,
+        "migration_source_id" : row['messageID']
     }
 
-    print(phoneNumberSmsLogObject)
+    insert_query = """
+    INSERT INTO phone_number_sms_logs (
+        "from",
+        "to",
+        content,
+        is_inbound,
+        provider_message_id,
+        provider_response,
+        occurred_at,
+        created_at,
+        updated_at,
+        status,
+        sent_by,
+        migration_source_id
+    ) VALUES (
+        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+    ) returning id
+    """
+    values = (
+        phoneNumberSmsLogObject['from'],
+        phoneNumberSmsLogObject['to'],
+        phoneNumberSmsLogObject['content'],
+        phoneNumberSmsLogObject['is_inbound'],
+        phoneNumberSmsLogObject['provider_message_id'],
+        phoneNumberSmsLogObject['provider_response'],
+        phoneNumberSmsLogObject['occurred_at'],
+        phoneNumberSmsLogObject['created_at'],
+        phoneNumberSmsLogObject['updated_at'],
+        phoneNumberSmsLogObject['status'],
+        phoneNumberSmsLogObject['sent_by'],
+        phoneNumberSmsLogObject['migration_source_id']
+    )
+
+    cursor.execute(insert_query, values)
+
+    conn.commit()
+    # print(f"Imported {row['messageID']}")
+    phoneNumberSmsLogId = cursor.fetchone()[0]
+    
+    logData = {
+        'from_name' : userName,
+        'from_id' : sentBy,
+        'to_id' : leadId,
+        'to_name' : get_lead_name(leadId),
+        'to_email': get_lead_email(leadId),
+        'message': row['body'].replace('\x00', '').encode('utf-8').decode('utf-8')
+    }
+
+    createEventLog('customer', leadId, 'sms_sent', logData, phoneNumberSmsLogObject['created_at'])
+    return True
 
 
 def create_lead_email(row):
@@ -269,6 +348,35 @@ def create_customer_sms(row):
     if(customerId == None):
         return False
     
+    
+    migId = getRelatedId('phone_number_sms_logs','migration_source_id',row['messageID'])
+    
+    if(migId != None):
+        # if( '@' in row['to']):
+        #     print(row['to'])
+        from_ = add_dashes(row['from'], "user"),
+        to_   = add_dashes(row['to']),
+        message_ = row['messageID']
+
+        
+        update_query="""
+            UPDATE phone_number_sms_logs SET
+            "from" = %s,
+            "to" = %s
+            where migration_source_id = %s
+        """
+
+        cursor.execute(update_query, (
+            add_dashes(row['from']),
+            add_dashes(row['to']),
+            row['messageID']
+        ))
+
+        
+        conn.commit()
+        # print(f"Updated {row['messageID']}")
+        return True
+
     phoneNumberSmsLogObject = { 
         "from": add_dashes(row['from']),
         "to": add_dashes(row['to']),
@@ -353,7 +461,9 @@ def read_csv():
     source_csv = "files/messages.csv"
     # source_csv = "files/messages-customers.csv"
     with open(source_csv, mode='r', newline='', encoding='utf-8') as file:
-        reader = csv.DictReader(file)
+        # reader = csv.DictReader(file)
+        reader = list(csv.DictReader(file))  # Convert reader to list to get its length
+
         # i = 0
         # for row in reader:
         #     res = process_row(row)
@@ -361,13 +471,31 @@ def read_csv():
         #         i = i + 1
         #     if i > 0:
         #         break
-        with Pool(processes=10) as pool:
-            result =pool.map(process_row, reader)            
+        with Pool(processes=20) as pool:
+            # Use tqdm to create a progress bar
+            with tqdm(total=len(reader), desc="Processing rows") as pbar:
+                result = []
+                for res in pool.imap(process_row, reader):
+                    result.append(res)
+                    pbar.update()
+            
             succeeded = len([item for item in result if item == True])
-            print(f'{succeeded} of {len(result)} imported')
+            print(f'{succeeded} of {len(result)} rows processed successfully')
+
+                # result =pool.map(process_row, reader)            
+                # succeeded = len([item for item in result if item == True])
+                # print(f'{succeeded} of {len(result)} imported')
 
 if __name__ == "__main__":
     os.system('cls' if os.name == 'nt' else 'clear')
     print('Starting process')
+    # print(add_dashes("+12404050161"))
+    # sentBy = get_user_id_by_email(add_dashes('+13017124918'))
+    # if(sentBy == None):
+    #     sentBy = getRelatedId('users','personal_phone_number',add_dashes('+13017124918')) or 2
+    #     sentBy = getRelatedId('users','id',add_dashes('+13017124918'))
+    # print(sentBy)
+    # print(add_dashes('mjeffries@hagerstownford.com'));
     read_csv()
+
     print('Done')

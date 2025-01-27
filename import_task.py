@@ -22,6 +22,26 @@ unsold_cadence ✅
 send_email ✅
 place_phone_call
 """
+tasks = [
+    "follow_up",
+    "appointment",
+    "reminder",
+    "outreach",
+    "meeting",
+    "to_do",
+    "other",
+    "callback",
+    "contact",
+    "phone_call",
+    "sold_follow_up",
+    "birthday_follow_up",
+    "anniversary_follow_up",
+    "unsold_follow_up",
+    "sold_cadence",
+    "unsold_cadence",
+    "send_email",
+    "place_phone_call"
+]
 task_type = 'place_phone_call'
 
 
@@ -1431,7 +1451,7 @@ def get_source_csv():
             return "files/follow_up.csv"
         case "birthday_follow_up":
             return "files/birthday_follow_up.csv"
-        case "todo":
+        case "to_do":
             return "files/to_do.csv"
         case "meeting":
             return "files/meeting.csv"
@@ -1482,4 +1502,9 @@ def read_csv():
 if __name__ == "__main__":
     os.system('cls' if os.name == 'nt' else 'clear')
     print('Starting process')
-    read_csv()
+    print(task_type )
+    for task in tasks:
+        task_type = task.strip()
+        # print(task_type)
+        read_csv()
+    # read_csv()

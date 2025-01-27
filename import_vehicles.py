@@ -62,6 +62,8 @@ def read_csv():
 
 
 def create_vehicle(data):
+    data = {key: None if value == "NULL" else value for key, value in data.items()}
+
     sql = """
         WITH v AS (
             INSERT INTO vehicles (

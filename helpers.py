@@ -6,7 +6,7 @@ import pytz
 import re
 
 conn = psycopg2.connect(
-    dbname="prod_v3_backup",
+    dbname="v1",
     user="postgres",
     password="root",
     host="localhost",
@@ -93,6 +93,34 @@ def get_username(id):
     result = cursor.fetchall()
     return result[0] if result else None
 
+def get_user_phone_by_email(email):
+    if(email == None):
+        return None
+    query = sql.SQL(f"SELECT personal_phone_number FROM users WHERE email = '{email}'")
+    cursor.execute(query)
+    result = cursor.fetchone()
+    return result[0] if result else None
+
+def get_phone_number_from_email(email, type = "user"):
+    if(email == None):
+        return None
+    if(type == "user"):
+        query = sql.SQL(f"SELECT personal_phone_number FROM users WHERE email = '{email}'")
+        cursor.execute(query)
+        result = cursor.fetchone()
+        return result[0] if result else None
+    if(type == "customer"):
+        query = sql.SQL(f"SELECT mobile_phone FROM customer_contact_information WHERE customer_id = (SELECT id FROM customers WHERE email = '{email}' LIMIT 1) order by id DESC")
+        cursor.execute(query)
+        result = cursor.fetchone()
+        return result[0] if result else None
+        
+    if(type == "lead"):
+        query = sql.SQL(f"SELECT phone_number FROM leads WHERE email = '{email}' order by id DESC LIMIT 1")
+        cursor.execute(query)
+        result = cursor.fetchone()
+        return result[0] if result else None
+
 def get_customer_name(id):
     if(id == None):
         return None
@@ -102,6 +130,22 @@ def get_customer_name(id):
     return result[0] if result else None
 
 def get_customer_email(id):
+    if(id == None):
+        return None
+    query = sql.SQL(f"select email from customers WHERE id = {id}")
+    cursor.execute(query)
+    result = cursor.fetchall()
+    return result[0] if result else None
+
+def get_lead_name(id):
+    if(id == None):
+        return None
+    query = sql.SQL(f"select concat(first_name,' ', last_name) as full_name from customers WHERE id = {id}")
+    cursor.execute(query)
+    result = cursor.fetchall()
+    return result[0] if result else None
+
+def get_lead_email(id):
     if(id == None):
         return None
     query = sql.SQL(f"select email from customers WHERE id = {id}")
@@ -185,23 +229,42 @@ def createSource(sourceObject):
     conn.commit()
     return cursor.fetchone()[0]
 
-def add_dashes(phone_number):
-    if phone_number is None:
-        return None
-    if phone_number == "":
-        return None
-    if phone_number == "NULL":
-        return None
-    phone_number = phone_number.replace("-", "")
+def extract_email(text):
+    match = re.search(r'[\w\.-]+@[\w\.-]+', text)
+    if match:
+        return match.group(0)
+    return None
 
+def add_dashes(phone_number, type = "user"):
+    raw_phone_number = phone_number
+    
+    if '@' in phone_number:
+        email = extract_email(phone_number)
+        return get_phone_number_from_email(email, type) or email
+    if phone_number is None or phone_number in ["", "NULL"]:
+        return None
+
+    # Remove country code +1 or 1 if present
+    if phone_number.startswith("+1"):
+        phone_number = phone_number[2:]
+    elif phone_number.startswith("1"):
+        phone_number = phone_number[1:]
+    phone_number = phone_number.replace("-", "")
+    phone_number = re.sub(r'\D', '', phone_number)
     # Add dashes to phone numbers for formatting (e.g., 1234567890 -> 123-456-7890)
-    return f"{phone_number[:3]}-{phone_number[3:6]}-{phone_number[6:]}"
+    phone_number = f"{phone_number[:3]}-{phone_number[3:6]}-{phone_number[6:]}"
+    if(phone_number == '--'):
+        return  get_user_phone_by_email(raw_phone_number)
+    return phone_number
 # createEventLog("lead", 99999, "event", "logData", "2025-01-09 16:03:13")
 
 def time_es_to_utc(datestring):
+    if isinstance(datestring, datetime):
+        return datestring
     if(datestring == '0000-00-00 00:00:00' or datestring == ''):
         print(f'weird datestring found {datestring}')
         datestring = '1990-01-01 00:00:00'
+    
     d = datetime.strptime(datestring,'%Y-%m-%d %H:%M:%S')
     pst = pytz.timezone("US/Eastern")
     esdate = pst.localize(d)

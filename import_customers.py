@@ -11,7 +11,12 @@ def process_row(row):
         row['source'] = "Web"
     row['source'] = sluggify(row['source']) + "-customers"
     source_id = getRelatedId("sources","slug", row['source'])
-    if(validate_date(row['createdAt']) == None or validate_date(row['updatedAt']) == None) :
+    try:
+        if(validate_date(row['createdAt']) == None or validate_date(row['updatedAt']) == None) :
+            return False
+    except:
+        print(f"Skipping.. {row['customerID']} - invalid date")
+        print(row)
         return False
     customerObject = {
         "id": customerId,
@@ -246,7 +251,8 @@ def read_csv():
             
             succeeded = len([item for item in result if item == True])
             print(f'{succeeded} of {len(result)} imported')
-
+    # createdAt = '2018-03-29 14:17:05'
+    # print(validate_date(createdAt))
 
 if __name__ == "__main__":
     os.system('cls' if os.name == 'nt' else 'clear')

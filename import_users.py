@@ -9,6 +9,9 @@ def process_row(row):
     if getRelatedId('users','migration_source_id',row['userID']) != None:
         print(f"Skipping.. {row['userID']} - doing update")
         return update_user(row)
+    if getRelatedId('users','email',row['email']) != None:
+        print(f"Skipping.. {row['email']} - email exists")
+        return update_user(row)
     
     userObject = {
         'first_name': row['firstName'],
@@ -70,7 +73,7 @@ def process_row(row):
 
     return True
 
-def update_user(row):
+def update_user(row, withPassword = False):
     userObject = {
         'first_name': row['firstName'],
         'last_name': row['lastName'],
@@ -80,8 +83,9 @@ def update_user(row):
         'password': '$2y$12$KWeeoypM9oYWJfiqqp9PMeNEToMzsaZry3iqFlhHqYipOS5rVWisO',
         'migration_source_id': row['userID'],
     }
-    print(userObject['email']);
-    print(userObject['personal_phone_number']);
+    if(withPassword==False):
+        userObject.pop('password')
+
 
     update_query = """
         UPDATE users SET 
