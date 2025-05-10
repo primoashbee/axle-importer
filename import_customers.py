@@ -3,8 +3,10 @@ import os
 from  helpers import *
 from multiprocessing import Pool
 import uuid
+from tqdm import tqdm
 
 def process_row(row):
+    row = {key: (None if value == 'NULL' else value) for key, value in row.items()}
     customerId = getRelatedId("customers","migration_source_id", row['customerID'])
     originalSource = row['source']
     if(row['source'].lower() == "website"):
@@ -15,16 +17,17 @@ def process_row(row):
         if(validate_date(row['createdAt']) == None or validate_date(row['updatedAt']) == None) :
             return False
     except:
-        print(f"Skipping.. {row['customerID']} - invalid date")
-        print(row)
+        # print(f"Skipping.. {row['customerID']} - invalid date")
+        # print(row)
         return False
+    
     customerObject = {
         "id": customerId,
         "customer_system_id" : str(uuid.uuid4()),
         "first_name": row['firstName'],
         "middle_name": None,
-        "last_name": row['lastName'],
-        "email" : row['email'],
+        "last_name": row['lastName'] or '',
+        "email": row['email'].lower() if row['email'] is not None else None,
         "birth_date" : validate_date(row['dateOfBirth']),
         "driver_license_id" : row['driverLicenseID'],
         "status": getRelatedId("sources", "slug", row['source']),
@@ -39,12 +42,12 @@ def process_row(row):
             "work_phone": None
         },
         "address" : {
-            "street_address": row['streetAddress'],
+            "street_address": row['streetAddress'] or '',
             "address_line_1": row['streetAddress'],
             "address_line_2": row['streetAddress'],
-            "city": row['city'],
-            "state": row['state'],
-            "zip_code": row['postalCode'],
+            "city": row['city'] or '',
+            "state": get_state_name(row['state']),
+            "zip_code": row['postalCode'] or '',
         }
     }
 
@@ -58,8 +61,11 @@ def process_row(row):
         source_id = createSource(sourceObject)
         customerObject['source_id'] = source_id
         
-
-    if(customerId == None):
+    select_query = "SELECT * FROM customers WHERE email = %s"
+    cursor.execute(select_query, (row['email'],))  
+    result = cursor.fetchone()
+    customer_exists = result is not None
+    if(customerId == None or customer_exists != True):
         # print(customerObject)
         create_customer(customerObject)
     else:
@@ -117,6 +123,7 @@ def create_customer(customerObject):
 
 def upsert_contact(contactObject, customerId):
     contactId = getRelatedId("customer_contact_information", 'customer_id', customerId )
+
     if(contactId == None):
         insert_query = """
         INSERT INTO customer_contact_information (
@@ -145,7 +152,7 @@ def upsert_contact(contactObject, customerId):
     SET mobile_phone = %s, work_phone = %s, home_phone = %s
     WHERE id = %s
     """
-    print("updating customer contact")
+    # print("updating customer contact")
     cursor.execute(update_query, (
         contactObject['mobile_phone'],
         contactObject['work_phone'],
@@ -184,7 +191,7 @@ def upsert_address(addressObject, customerId):
         ))
         result = cursor.fetchone()
         conn.commit()
-        print('inserting new address')
+        # print('inserting new address')
         return result[0] if result else None
     
 
@@ -205,12 +212,13 @@ def upsert_address(addressObject, customerId):
         addressId
     ))
 
-    print("updating customer address")
+    # print("updating customer address")
     
     conn.commit()
     return addressId
 
 def update_customer(customerObject):
+
     update_query = """
     UPDATE customers SET 
     first_name = %s, 
@@ -245,12 +253,20 @@ def read_csv():
     source_csv = get_source_csv()
     i = 0
     with open(source_csv, mode='r', newline='', encoding='utf-8') as file:
-        reader = csv.DictReader(file)
+        reader = list(csv.DictReader(file))
         with Pool(processes=10) as pool:
-            result =pool.map(process_row, reader)
+            with tqdm(total=len(reader), desc="Processing rows") as pbar:
+                result = []
+                for res in pool.imap(process_row, reader):
+                    result.append(res)
+                    pbar.update()
             
-            succeeded = len([item for item in result if item == True])
-            print(f'{succeeded} of {len(result)} imported')
+        succeeded = len([item for item in result if item == True])
+        print(f'{succeeded} of {len(result)} rows processed successfully')
+            # result =pool.map(process_row, reader)
+            
+            # succeeded = len([item for item in result if item == True])
+            # print(f'{succeeded} of {len(result)} imported')
     # createdAt = '2018-03-29 14:17:05'
     # print(validate_date(createdAt))
 

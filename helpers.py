@@ -4,9 +4,10 @@ from psycopg2 import sql
 from datetime import datetime
 import pytz
 import re
+import logging
 
 conn = psycopg2.connect(
-    dbname="v1",
+    dbname="axle-04-28",
     user="postgres",
     password="root",
     host="localhost",
@@ -19,8 +20,6 @@ def createEventLog(loggable, loggableId, event, logData, createdAt):
     """
         Mimic createEventLog on Laravel app.
     """
-    
-    
 
     data = {
             "user_type" : None,
@@ -137,6 +136,19 @@ def get_customer_email(id):
     result = cursor.fetchall()
     return result[0] if result else None
 
+def get_lead_info(id):
+    if(id == None):
+        return None
+    query = sql.SQL(f"SELECT * FROM leads WHERE id = {id}")
+    cursor.execute(query)
+    result = cursor.fetchone()
+    if result:
+        fields = [field[0] for field in cursor.description]
+        data = dict(zip(fields, result))
+        return data
+    else:
+        return None
+
 def get_lead_name(id):
     if(id == None):
         return None
@@ -167,23 +179,31 @@ def get_lead_details(id):
 
 
 
-def getRelatedId(table, column, value):
-    """
-    Fetch the related ID from a given table and column, or return None if not found.
-    """
-    if(value == None or value == ''):
-        return None
+# def getRelatedId(table, column, value):
+#     """
+#     Fetch the related ID from a given table and column, or return None if not found.
+#     """
+#     if(value == None or value == '' or value == 'NULL' or value == "NULL"):
+#         return None
     
-    query = sql.SQL("SELECT id FROM {table} WHERE {column} = %s order by id DESC").format(
-        table=sql.Identifier(table),
-        column=sql.Identifier(column)
-    )
-    cursor.execute(query, (value,))
-    
-    result = cursor.fetchone()
-    # if(result == None):
-    #     print(cursor.mogrify(query.as_string(cursor), (value,)).decode("utf-8"))
+#     query = sql.SQL("SELECT id FROM {table} WHERE {column} = %s order by id DESC").format(
+#         table=sql.Identifier(table),
+#         column=sql.Identifier(column)
+#     )
 
+
+#     cursor.execute(query, (value,))
+    
+#     result = cursor.fetchone()
+#     # if(result != None):
+#     #     print(cursor.mogrify(query.as_string(cursor), (value,)).decode("utf-8"))
+
+#     return result[0] if result else None
+
+def getRelatedId(table, column, value):
+    query = f"SELECT id FROM {table} WHERE {column} = %s order by id DESC"
+    cursor.execute(query, (value,))
+    result = cursor.fetchone()
     return result[0] if result else None
 
 def get_user_id_by_email(value):
@@ -237,7 +257,8 @@ def extract_email(text):
 
 def add_dashes(phone_number, type = "user"):
     raw_phone_number = phone_number
-    
+    if phone_number is None:
+        return None
     if '@' in phone_number:
         email = extract_email(phone_number)
         return get_phone_number_from_email(email, type) or email
@@ -262,9 +283,10 @@ def time_es_to_utc(datestring):
     if isinstance(datestring, datetime):
         return datestring
     if(datestring == '0000-00-00 00:00:00' or datestring == ''):
-        print(f'weird datestring found {datestring}')
+        # print(f'weird datestring found {datestring}')
         datestring = '1990-01-01 00:00:00'
-    
+    if(datestring in ("NULL", None, 'NULL')):
+        datestring = '1990-01-01 00:00:00'
     d = datetime.strptime(datestring,'%Y-%m-%d %H:%M:%S')
     pst = pytz.timezone("US/Eastern")
     esdate = pst.localize(d)
@@ -310,3 +332,20 @@ def get_attendant(attendant_type, id):
             attendant['attendant_id'] = attendant_id
             attendant['attendant_type'] = 'customer'
     return attendant
+
+def get_state_name(state):
+    file_path = "states.json"
+    if(state == None or state == ''):
+        return ''
+    with open(file_path, "r") as file:
+        states = json.load(file)
+        return states.get(state, state)
+
+def log(value):
+    log_file = "app.log"
+    logging.basicConfig(
+        filename=log_file,
+        level=logging.INFO,
+        format="%(asctime)s - %(message)s",
+    )
+    logging.info(value)

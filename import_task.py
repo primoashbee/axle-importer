@@ -2,26 +2,33 @@ import csv
 import os
 from  helpers import *
 from multiprocessing import Pool
+from tqdm import tqdm
+import logging
+import functools
+
+
 """
-follow_up ✅
-appointment ✅
-reminder ✅
-outreach ✅
-meeting ✅
-to_do ✅
-other ✅
-callback ✅
-contact ✅
-phone_call ✅
-sold_follow_up ✅
-birthday_follow_up ✅
-anniversary_follow_up ✅
-unsold_follow_up ✅
-sold_cadence ✅
-unsold_cadence ✅
-send_email ✅
+follow_up x
+appointment x
+reminder x
+outreach x
+meeting x
+to_do x
+other x
+callback x
+contact x
+phone_call x
+sold_follow_up x
+birthday_follow_up  x
+anniversary_follow_up x
+unsold_follow_up x
+sold_cadence 
+unsold_cadence 
+send_email 
 place_phone_call
 """
+# task_type = 'place_phone_call'
+
 tasks = [
     "follow_up",
     "appointment",
@@ -38,14 +45,19 @@ tasks = [
     "anniversary_follow_up",
     "unsold_follow_up",
     "sold_cadence",
-    "unsold_cadence",
+    "unsold_cadence", #wip
     "send_email",
     "place_phone_call"
 ]
-task_type = 'place_phone_call'
 
+task_type = None
 
-def process_row(row):
+def process_row(task_type, row):
+    row = {key: (None if value == 'NULL' else value) for key, value in row.items()}
+    
+    if row['status'] is None or row['status'] == '' or row['status'] == 'NULL':
+        return False
+    
     match task_type:
         case 'follow_up':
             return process_row_follow_up(row)
@@ -73,6 +85,8 @@ def process_row(row):
             return process_row_place_phone_call(row)
         case 'todo':
             return process_row_todo(row)
+        case 'to_do':
+            return process_row_todo(row)
         case 'phone_call':
             return process_row_phone_call(row)
         case 'call': #x
@@ -93,17 +107,17 @@ def process_row(row):
 def process_row_follow_up(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -112,7 +126,7 @@ def process_row_follow_up(row):
     author = get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -120,7 +134,7 @@ def process_row_follow_up(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']),
-        "task_category_id":getRelatedId('task_categories','slug','follow-up'),
+        "task_category_id": 9,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -155,17 +169,17 @@ def process_row_follow_up(row):
 def process_row_meeting(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -174,7 +188,7 @@ def process_row_meeting(row):
     author = get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -182,7 +196,7 @@ def process_row_meeting(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']),
-        "task_category_id":getRelatedId('task_categories','slug','meeting'),
+        "task_category_id": 11,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -217,17 +231,17 @@ def process_row_meeting(row):
 def process_row_contact(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -236,15 +250,15 @@ def process_row_contact(row):
     author = get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
         "customer_id":attendant['customer_id'],
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
-        "task_status_id":getRelatedId('task_statuses','slug',row['status']) or 8,
-        "task_category_id":getRelatedId('task_categories','slug','contact'),
+        "task_status_id":getRelatedId('task_statuses','slug', row['status']) or 8,
+        "task_category_id": 12,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -279,17 +293,17 @@ def process_row_contact(row):
 def process_row_sold_follow_up(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -298,7 +312,7 @@ def process_row_sold_follow_up(row):
     author = get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -306,7 +320,7 @@ def process_row_sold_follow_up(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']) or 8,
-        "task_category_id":getRelatedId('task_categories','slug','sold-follow-up'),
+        "task_category_id": 13,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -341,17 +355,17 @@ def process_row_sold_follow_up(row):
 def process_row_birthday_follow_up(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -360,7 +374,7 @@ def process_row_birthday_follow_up(row):
     author = get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -368,7 +382,7 @@ def process_row_birthday_follow_up(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']) or 8,
-        "task_category_id":getRelatedId('task_categories','slug','birthday-follow-up'),
+        "task_category_id": 14,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -402,17 +416,17 @@ def process_row_birthday_follow_up(row):
 def process_row_anniversary_follow_up(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -421,7 +435,7 @@ def process_row_anniversary_follow_up(row):
     author = get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -429,7 +443,7 @@ def process_row_anniversary_follow_up(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']) or 8,
-        "task_category_id":getRelatedId('task_categories','slug','anniversary-follow-up'),
+        "task_category_id": 15,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -463,17 +477,17 @@ def process_row_anniversary_follow_up(row):
 def process_row_unsold_follow_up(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -482,7 +496,7 @@ def process_row_unsold_follow_up(row):
     author = get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -490,7 +504,7 @@ def process_row_unsold_follow_up(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']) or 8,
-        "task_category_id":getRelatedId('task_categories','slug','unsold-follow-up'),
+        "task_category_id": 17,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -525,17 +539,17 @@ def process_row_unsold_follow_up(row):
 def process_row_sold_cadence(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -544,7 +558,7 @@ def process_row_sold_cadence(row):
     author = get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -552,7 +566,7 @@ def process_row_sold_cadence(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']) or 8,
-        "task_category_id":getRelatedId('task_categories','slug','sold-cadence'),
+        "task_category_id": 18,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -582,23 +596,23 @@ def process_row_sold_cadence(row):
         }
     }
     create_task(task_object)
-    print(f"Task created with migration id {row['id']}")
+    # print(f"Task created with migration id {row['id']}")
     return True
 
 def process_row_unsold_cadence(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -607,7 +621,7 @@ def process_row_unsold_cadence(row):
     author = get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -615,7 +629,7 @@ def process_row_unsold_cadence(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']) or 8,
-        "task_category_id":getRelatedId('task_categories','slug','unsold-cadence'),
+        "task_category_id": 17,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -645,23 +659,23 @@ def process_row_unsold_cadence(row):
         }
     }
     create_task(task_object)
-    print(f"Task created with migration id {row['id']}")
+    # print(f"Task created with migration id {row['id']}")
     return True
 
 def process_row_send_email(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -670,7 +684,7 @@ def process_row_send_email(row):
     author = get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -678,7 +692,7 @@ def process_row_send_email(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']) or 8,
-        "task_category_id":getRelatedId('task_categories','slug','send-email'),
+        "task_category_id": 21,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -708,23 +722,23 @@ def process_row_send_email(row):
         }
     }
     create_task(task_object)
-    print(f"Task created with migration id {row['id']}")
+    # print(f"Task created with migration id {row['id']}")
     return True
 
 def process_row_place_phone_call(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -733,7 +747,7 @@ def process_row_place_phone_call(row):
     author = get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -741,7 +755,7 @@ def process_row_place_phone_call(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']) or 8,
-        "task_category_id":getRelatedId('task_categories','slug','place-phone-call'),
+        "task_category_id": 22,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -771,23 +785,23 @@ def process_row_place_phone_call(row):
         }
     }
     create_task(task_object)
-    print(f"Task created with migration id {row['id']}")
+    # print(f"Task created with migration id {row['id']}")
     return True
 
 def process_row_outreach(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -796,7 +810,7 @@ def process_row_outreach(row):
     author = get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -804,7 +818,7 @@ def process_row_outreach(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']),
-        "task_category_id":getRelatedId('task_categories','slug','outreach'),
+        "task_category_id": 10,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -839,17 +853,17 @@ def process_row_outreach(row):
 def process_row_other(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -858,7 +872,7 @@ def process_row_other(row):
     author =get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -866,7 +880,7 @@ def process_row_other(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']),
-        "task_category_id":getRelatedId('task_categories','slug','other'),
+        "task_category_id": 7,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -904,17 +918,17 @@ def process_row_other(row):
 def process_row_todo(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -923,7 +937,7 @@ def process_row_todo(row):
     author =get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -931,7 +945,7 @@ def process_row_todo(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']),
-        "task_category_id":getRelatedId('task_categories','slug','other'),
+        "task_category_id": 1,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -966,17 +980,17 @@ def process_row_todo(row):
 def process_row_phone_call(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -985,7 +999,7 @@ def process_row_phone_call(row):
     author =get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -993,7 +1007,7 @@ def process_row_phone_call(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']),
-        "task_category_id":getRelatedId('task_categories','slug','phone-call'),
+        "task_category_id": 2,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -1028,17 +1042,17 @@ def process_row_phone_call(row):
 def process_row_call(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -1047,7 +1061,7 @@ def process_row_call(row):
     author =get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -1055,7 +1069,7 @@ def process_row_call(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']),
-        "task_category_id":getRelatedId('task_categories','slug','call'),
+        "task_category_id": 3,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -1090,17 +1104,17 @@ def process_row_call(row):
 def process_row_callback(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -1109,7 +1123,7 @@ def process_row_callback(row):
     author =get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -1117,7 +1131,7 @@ def process_row_callback(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status']),
-        "task_category_id":getRelatedId('task_categories','slug','callback'),
+        "task_category_id": 4,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -1150,19 +1164,40 @@ def process_row_callback(row):
     return True
 
 def process_row_appointment(row):
+    # log_file = "app.log"
+    # logging.basicConfig(
+    #     filename=log_file,
+    #     level=logging.INFO,
+    #     format="%(asctime)s - %(message)s",
+
+    # )
+    # logging.info(f"Row ID: {row['id']}")
+    # if(row['id'] == 1307191 or row['id'] == "1307191"):
+    #     print(row)
+    # return False
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
-        return False
+        ## print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        update_query = """
+            UPDATE tasks set task_category_id = %s
+            WHERE migration_source_id = %s
+        """
+
+        cursor.execute(update_query, (
+            5,
+            row['id']
+        ))
+        conn.commit()
+        return True
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        ## print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -1171,7 +1206,7 @@ def process_row_appointment(row):
     author =get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -1179,7 +1214,7 @@ def process_row_appointment(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id":getRelatedId('task_statuses','slug',row['status'].lower()),
-        "task_category_id":getRelatedId('task_categories','slug','appointment'),
+        "task_category_id": 5,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -1242,17 +1277,17 @@ def process_row_appointment(row):
 def process_row_reminder(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        #print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     created_date = time_es_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     time = time_es_to_utc(row['time'])
     taskId = getRelatedId('tasks','migration_source_id',row['id'])
     if taskId:
-        print(f"Task with ID {row['id']} already exists. Skipping")
+        # print(f"Task with ID {row['id']} already exists. Skipping")
         return False
     authorId = getRelatedId('users','migration_source_id',row['hostID']) or 2
     assigneeId = getRelatedId('users','migration_source_id',row['userID'])
@@ -1261,7 +1296,7 @@ def process_row_reminder(row):
     author =get_username(authorId)
 
     if(assigneeId == None):
-        print(f"no assignee {assigneeId}")
+        # print(f"no assignee {assigneeId}")
         return False
     task_object = {
         "author_id": authorId,
@@ -1269,7 +1304,7 @@ def process_row_reminder(row):
         "lead_id":attendant['lead_id'],
         "assignee_id":getRelatedId('users','migration_source_id',row['hostID']),
         "task_status_id": getRelatedId('task_statuses','slug',row['status']),
-        "task_category_id":getRelatedId('task_categories','slug','reminder'),
+        "task_category_id": 6,
         "task_priority_id":"2",
         "due_date":time.strftime('%Y-%m-%d'),
         "due_time":time.strftime('%H:%M:%S'),
@@ -1396,7 +1431,7 @@ def create_appointment(appointment_object):
         appointment_object['customer_id'],
         appointment_object['appointment_date'],
         appointment_object['appointment_time'],
-        appointment_object['description'],
+        appointment_object['description'] or "N/A",
         appointment_object['created_at'],
         appointment_object['updated_at'],
         appointment_object['user_id'],
@@ -1445,20 +1480,20 @@ def create_task_appointment(taskId, appointmentId):
     taskAppointmentId = cursor.fetchone()[0];
     return taskAppointmentId
 
-def get_source_csv():
+def get_source_csv(task_type):
     match task_type:
         case "follow_up":
             return "files/follow_up.csv"
         case "birthday_follow_up":
             return "files/birthday_follow_up.csv"
         case "to_do":
-            return "files/to_do.csv"
+            return "may-2025-files/to_do.csv"
         case "meeting":
             return "files/meeting.csv"
         case "outreach":
             return "files/outreach.csv"
         case "contact":
-            return "files/contact.csv"
+            return "may-2025-files/contact.csv"
         case "sold_follow_up":
             return "files/sold_follow_up.csv"
         case "anniversary_follow_up":
@@ -1474,26 +1509,31 @@ def get_source_csv():
         case "place_phone_call":
             return "files/place_phone_call.csv"
         case "phone_call":
-            return "files/phone_call.csv"
+            return "may-2025-files/phone_call.csv"
         case "call":
             return "files/call.csv"
         case "callback":
-            return "files/callback.csv"
+            return "may-2025-files/callback.csv"
         case "appointment":
-            return "files/appointment.csv"
+            return "may-2025-files/appointment.csv"
         case "reminder":
-            return "files/reminder.csv"
+            return "may-2025-files/reminder.csv"
         case "other":
-            return "files/other.csv"
+            return "may-2025-files/other.csv"
             
 
-def read_csv():
-    source_csv = get_source_csv()
+def read_csv(task_type):
+    source_csv = get_source_csv(task_type)
     i = 0
     with open(source_csv, mode='r', newline='', encoding='utf-8') as file:
-        reader = csv.DictReader(file)
-        with Pool(processes=10) as pool:
-            result =pool.map(process_row, reader)
+        reader = list(csv.DictReader(file))
+        with Pool(processes=20) as pool:
+            with tqdm(total=len(reader), desc="Processing rows") as pbar:
+                result = []
+                partial_process_row = functools.partial(process_row, task_type)
+                for res in pool.imap(partial_process_row, reader):
+                    result.append(res)
+                    pbar.update()
             
             succeeded = len([item for item in result if item == True])
             print(f'{succeeded} of {len(result)} imported')
@@ -1502,9 +1542,17 @@ def read_csv():
 if __name__ == "__main__":
     os.system('cls' if os.name == 'nt' else 'clear')
     print('Starting process')
-    print(task_type )
-    for task in tasks:
-        task_type = task.strip()
-        # print(task_type)
-        read_csv()
+    # task_type="contact"
     # read_csv()
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    export_dir = os.path.join(base_dir, 'may-2025-files')
+    filenames = [os.path.splitext(file)[0] for file in os.listdir(export_dir) if os.path.isfile(os.path.join(export_dir, file))]
+
+    print(filenames)
+
+    # exit
+    for task in filenames:
+        print(f"Processing {task}...")
+        
+        read_csv(task.strip())

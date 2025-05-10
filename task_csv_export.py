@@ -4,7 +4,9 @@ import os
 # Function to split source CSV into multiple files based on the 'type' column
 def split_csv_by_type(source_file):
     # Get the directory of the current script
-    output_dir = os.path.dirname(os.path.abspath(__file__))
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    # output_dir = os.path.join(base_dir, 'files')
+    output_dir = os.path.join(base_dir, 'may-2025-files')
 
     # Read the source file
     with open(source_file, mode='r', newline='', encoding='utf-8') as file:
@@ -29,5 +31,5 @@ def split_csv_by_type(source_file):
     print(f"Files successfully created in {output_dir}")
 
 # Example usage
-source_csv = "filestask_view.csv"  # Replace with the path to your source CSV file
+source_csv = "may 2025 exports/tasks_may_2025_view.csv"  # Replace with the path to your source CSV file
 split_csv_by_type(source_csv)

@@ -3,3 +3,9 @@ files/*
 .DS_Store
 .DS_Store
 __pycache__/helpers.cpython-312.pyc
+files*/
+may*/
+*.csv
+*.dump
+*.log
+.DS_Store

@@ -7,6 +7,7 @@ from helpers import createEventLog, getRelatedId, add_dashes, cursor, conn, vali
 import uuid
 import os
 from multiprocessing import Pool
+from tqdm import tqdm
 
 def process_row(row):
     return create_phone_call(row)
@@ -70,7 +71,7 @@ def create_phone_call(row):
     
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
-        print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
+        # print(f'No record found for attendant: {row['attendant_type']} {row['attendant_id']}. Skipping ID {row['id']}')
         return False
     
     callerUserId =  getRelatedId("users", "migration_source_id", row['hostID'])
@@ -193,12 +194,17 @@ def read_csv():
     source_csv = "files/phone_call.csv"
     i = 0
     with open(source_csv, mode='r', newline='', encoding='utf-8') as file:
-        reader = csv.DictReader(file)
-        with Pool(processes=10) as pool:
-            result =pool.map(process_row, reader)
-            
-            succeeded = len([item for item in result if item == True])
-            print(f'{succeeded} of {len(result)} imported')
+        reader = list(csv.DictReader(file))
+        with Pool(processes=20) as pool:
+            with tqdm(total=len(reader), desc="Processing rows") as pbar:
+                result = []
+                for res in pool.imap(process_row, reader):
+                    result.append(res)
+                    pbar.update()
+                # result =pool.map(process_row, reader)
+                
+        succeeded = len([item for item in result if item == True])
+        print(f'{succeeded} of {len(result)} imported')
 
 
 if __name__ == "__main__":

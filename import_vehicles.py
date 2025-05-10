@@ -2,15 +2,15 @@ import csv
 import os
 from  helpers_vehicle import *
 from multiprocessing import Pool
-
+from tqdm import tqdm
 
 def process_row(row):
     # row = {key: (None if value == 'NULL' else value) for key, value in row.items()}
 
     mig_id = getRelatedId('vehicles','migration_source_id',row['vehicleID'])
-    if (mig_id != None):
-        print(f"Vehicle with migration source id {row["vehicleID"]} exists. Skipping.")
-        return False
+    # if (mig_id != None):
+    #     # print(f"Vehicle with migration source id {row["vehicleID"]} exists. Skipping.")
+    #     return False
 
     created_at = time_es_to_utc(row['createdAt']) #.strftime('%Y-%m-%d %H:%M:%S')
     updated_at = time_es_to_utc(row['updatedAt']) #.strftime('%Y-%m-%d %H:%M:%S')
@@ -47,14 +47,20 @@ def read_csv():
     source_csv = "files/vehicles.csv"
     i = 0
     with open(source_csv, mode='r', newline='', encoding='utf-8') as file:
-        reader = csv.DictReader(file)
+        reader = list(csv.DictReader(file))
         # for row in reader:
         #     process_row(row)
         #     i = i + 1
         #     if i > 10:
         #         break
-        with Pool(processes=10) as pool:
-            result =pool.map(process_row, reader)            
+        with Pool(processes=1) as pool:
+            with tqdm(total=len(reader), desc="Processing rows") as pbar:
+                result = []
+                for res in pool.imap(process_row, reader):
+                    result.append(res)
+                    pbar.update()
+
+            # result =pool.map(process_row, reader)            
             succeeded = len([item for item in result if item == True])
             print(f'{succeeded} of {len(result)} imported')
             
@@ -63,7 +69,6 @@ def read_csv():
 
 def create_vehicle(data):
     data = {key: None if value == "NULL" else value for key, value in data.items()}
-
     sql = """
         WITH v AS (
             INSERT INTO vehicles (
@@ -101,6 +106,7 @@ def create_vehicle(data):
             retail_value
         )
         SELECT v.id, v.created_at, v.updated_at, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM v
+        RETURNING id
     """
     params =[
             data["vin"],
@@ -121,11 +127,23 @@ def create_vehicle(data):
             data["retail_value"]
         ]
     try:
+        # query = cursor.mogrify(sql, params).decode("utf-8")  # Decode the query to a string
+        # print("Executing SQL Query:\n" + query)  # Beautify the output with a label and formatting
+        # log_file = "sql_queries.log"
+        # with open(log_file, "a") as f:
+            # f.write(query + "\n")
         cursor.execute(sql, params)
         conn.commit()
+        result = cursor.fetchone()
+        if result:
+            return result[0]
+        else:
+            print("No vehicle record returned.")
+            return None        
+        # return vehicle_id
     except Exception as e:
-        print("error ah")
-        print(cursor.mogrify(sql, params))
+        # print("error ah")
+        # print(cursor.mogrify(sql, params))
         raise e
 
 

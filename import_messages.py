@@ -25,16 +25,16 @@ def process_row(row):
     #     return False
     
     recipient = row['recipient']
+    
+    # Done
     if( recipient == 'lead' and row_type == 'text'):
         return create_lead_sms(row)
     
-    return False
+    # Done
     if( recipient == 'lead' and row_type == 'mail'):
-        return False
         return create_lead_email(row)
     
     if( recipient == 'customer' and row_type == 'mail'):
-        return False
         return create_customer_email(row)
     
     if( recipient == 'customer' and row_type == 'text'):
@@ -48,14 +48,14 @@ def create_lead_sms(row):
 
     if(sentBy == None):
         sentBy = getRelatedId('users','personal_phone_number',row['from']) or 2
-    
     if(leadId == None):
         return False
 
     migId = getRelatedId('phone_number_sms_logs','migration_source_id',row['messageID'])
 
-    if(migId != None):
-        
+    
+    if(migId is not None):
+        return True
         update_query="""
             UPDATE phone_number_sms_logs SET
             "from" = %s,
@@ -126,14 +126,16 @@ def create_lead_sms(row):
 
     conn.commit()
     # print(f"Imported {row['messageID']}")
-    phoneNumberSmsLogId = cursor.fetchone()[0]
-    
+    # phoneNumberSmsLogId = cursor.fetchone()[0]
+    # lead_info = (leadId) or 'N/A'
+    to_name = get_lead_name(leadId) or 'N/A'
+    to_email = get_lead_email(leadId) or 'N/A'
     logData = {
         'from_name' : userName,
         'from_id' : sentBy,
         'to_id' : leadId,
-        'to_name' : get_lead_name(leadId),
-        'to_email': get_lead_email(leadId),
+        'to_name' : to_name,
+        'to_email': to_email,
         'message': row['body'].replace('\x00', '').encode('utf-8').decode('utf-8')
     }
 
@@ -343,6 +345,7 @@ def create_customer_sms(row):
     sentBy = get_user_id_by_email(row['from'])
     userName = get_username(sentBy)
     customerId = getRelatedId('customers','migration_source_id',row['recipientID'])
+
     if(sentBy == None):
         sentBy = getRelatedId('users','personal_phone_number',row['from']) or 2
     if(customerId == None):
@@ -354,26 +357,26 @@ def create_customer_sms(row):
     if(migId != None):
         # if( '@' in row['to']):
         #     print(row['to'])
-        from_ = add_dashes(row['from'], "user"),
-        to_   = add_dashes(row['to']),
-        message_ = row['messageID']
+        # from_ = add_dashes(row['from'], "user"),
+        # to_   = add_dashes(row['to']),
+        # message_ = row['messageID']
 
         
-        update_query="""
-            UPDATE phone_number_sms_logs SET
-            "from" = %s,
-            "to" = %s
-            where migration_source_id = %s
-        """
+        # update_query="""
+        #     UPDATE phone_number_sms_logs SET
+        #     "from" = %s,
+        #     "to" = %s
+        #     where migration_source_id = %s
+        # """
 
-        cursor.execute(update_query, (
-            add_dashes(row['from']),
-            add_dashes(row['to']),
-            row['messageID']
-        ))
+        # cursor.execute(update_query, (
+        #     add_dashes(row['from']),
+        #     add_dashes(row['to']),
+        #     row['messageID']
+        # ))
 
         
-        conn.commit()
+        # conn.commit()
         # print(f"Updated {row['messageID']}")
         return True
 
@@ -458,7 +461,9 @@ def create_customer_sms(row):
         return False
 
 def read_csv():
-    source_csv = "files/messages.csv"
+    source_csv = "may 2025 exports/messages_may_2025_view.csv"
+    # source_csv = "files/lead_mail_view.csv"
+    # source_csv = "files/lead_sms_view.csv"
     # source_csv = "files/messages-customers.csv"
     with open(source_csv, mode='r', newline='', encoding='utf-8') as file:
         # reader = csv.DictReader(file)
@@ -497,5 +502,3 @@ if __name__ == "__main__":
     # print(sentBy)
     # print(add_dashes('mjeffries@hagerstownford.com'));
     read_csv()
-
-    print('Done')

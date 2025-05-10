@@ -24,6 +24,8 @@ def get_or_create_make(make, created_at, updated_at):
     id = cursor.fetchone()
 
 def get_or_create_type(type, created_at, updated_at):
+    if(type == None):
+        return None
     cursor.execute("SELECT id FROM vehicle_types where lower(name) = lower(%s)",[type])    
     id = cursor.fetchone()
     if(id):
@@ -82,6 +84,19 @@ def get_vehicle_id(data):
         SELECT id FROM vehicles WHERE vin = %s AND model_id = %s AND make_id = %s AND year = %s
     """
     cursor.execute(sql, [data['VIN'],model_id, make_id, data['year']])
+    id = cursor.fetchone()
+    if id:
+        return id[0]
+    else:
+        return None
+    
+def get_vehicle_by_vin(vin):
+    if(len(vin) == 0):
+        return None
+    sql = """
+        SELECT id FROM vehicles WHERE lower(vin) = %s
+    """
+    cursor.execute(sql, [vin.lower()])
     id = cursor.fetchone()
     if id:
         return id[0]
