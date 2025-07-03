@@ -28,8 +28,9 @@ def process_row(row):
     #     'migration_source_id' : $row['migration_source_id'],
     # ];
     
-    if(getRelatedId('deal_payments','migration_source_id',row['financingID']) != None):
-        return False
+    # if(getRelatedId('deal_payments','migration_source_id',row['financingID']) != None):
+    #     print(row['financingID'], 'already exists')
+    #     return False
     if(row['dealID'] is None):
         return False
     dealId = getRelatedId('deals','migration_source_id',row['dealID'])
@@ -53,6 +54,7 @@ def process_row(row):
     insert_query = """
         INSERT INTO deal_payments (deal_id, down_payment, term, rate, payment, amount_financed, created_at, updated_at, migration_source_id)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
     """
     values = (
         dealPayment['deal_id'],
@@ -68,7 +70,7 @@ def process_row(row):
 
     cursor.execute(insert_query, values)
     conn.commit()
-    
+    result =  cursor.fetchone()
     return True
 
 def get_source_csv():

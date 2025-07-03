@@ -12,8 +12,10 @@ from tqdm import tqdm
 csv.field_size_limit(sys.maxsize)
 
 def process_row(row):
-    
+    if(row['recipientID'] not in [2995, "2995"]):
+        return False
     row_type = row['type']
+
     # if (row_type == 'mail' and getRelatedId('email_logs','migration_source_id',row['messageID']) != None):
     # if (row_type == 'mail'):
     #     print(f"Skipping.. {row['messageID']}")
@@ -165,8 +167,8 @@ def create_lead_email(row):
             "subject": row['subject'],
             "body": row["body"],
             "bound_type": 'OUTBOUND',
-            "created_at": time_pacific_to_utc(row["createdAt"]),
-            "updated_at": time_pacific_to_utc(row["updatedAt"]),
+            "created_at": row["createdAt"],
+            "updated_at": row["updatedAt"],
             "lead_id": attendant['lead_id'],
             "migration_source_id": row['messageID'],
 
@@ -265,8 +267,8 @@ def create_customer_email(row):
             "subject": row['subject'],
             "body": row["body"],
             "bound_type": 'OUTBOUND',
-            "created_at": time_pacific_to_utc(row["createdAt"]),
-            "updated_at": time_pacific_to_utc(row["updatedAt"]),
+            "created_at": row["createdAt"],
+            "updated_at": row["updatedAt"],
             "lead_id": attendant['lead_id'],
             "migration_source_id": row['messageID'],
 
@@ -469,7 +471,7 @@ def create_customer_sms(row):
         return False
 
 def read_csv():
-    source_csv = "may 2025 exports/messages_may_2025_view.csv"
+    source_csv = "files/messages.csv"
     # source_csv = "files/lead_mail_view.csv"
     # source_csv = "files/lead_sms_view.csv"
     # source_csv = "files/messages-customers.csv"

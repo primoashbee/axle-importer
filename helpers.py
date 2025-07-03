@@ -5,14 +5,49 @@ from datetime import datetime
 import pytz
 import re
 import logging
+# host = "axle-prd-usea1-crm-db.cjjspmdvfxbj.us-east-1.rds.amazonaws.com"
+mode = "local"
+# host = "awseb-e-3rznwcyhm9-stack-awsebrdsdatabase-hmh4mlz3imqs.cjjspmdvfxbj.us-east-1.rds.amazonaws.com",
+# QA
+# conn = psycopg2.connect(
+#     dbname="prod_bup_20250330",
+#     user="postgres",
+#     password="GAtCxz9a2zGNQQ",
+#     host=host
+#     port=5432
+# )
 
-conn = psycopg2.connect(
-    dbname="axle-04-28",
-    user="postgres",
-    password="root",
-    host="localhost",
-    port=5432
-)
+# if(host == "axle-prd-usea1-crm-db.cjjspmdvfxbj.us-east-1.rds.amazonaws.com"):
+
+
+#LOCAL 
+if(mode == "prod"):
+    conn = psycopg2.connect(
+        dbname="axle-crm-prod",
+        user="postgres",
+        password="Hbo2lUswKWgywwZ",
+        host="axle-prd-usea1-crm-db.cjjspmdvfxbj.us-east-1.rds.amazonaws.com",
+        port=5432
+    )
+
+if(mode == "qa"):
+    conn = psycopg2.connect(
+        dbname="prod_bup_20250330",
+        user="postgres",
+        password="GAtCxz9a2zGNQQ",
+        host="awseb-e-3rznwcyhm9-stack-awsebrdsdatabase-hmh4mlz3imqs.cjjspmdvfxbj.us-east-1.rds.amazonaws.com",
+        port=5432
+    )
+
+if(mode == "local"):
+    conn = psycopg2.connect(
+        dbname="jun-13-bup",
+        user="postgres",
+        password="root",
+        host="localhost",
+        port=5432
+    )
+# )
 global cursor
 cursor = conn.cursor()
 
@@ -279,19 +314,41 @@ def add_dashes(phone_number, type = "user"):
     return phone_number
 # createEventLog("lead", 99999, "event", "logData", "2025-01-09 16:03:13")
 
-def time_es_to_utc(datestring):
+def time_pacific_to_utc(datestring):
     if isinstance(datestring, datetime):
         return datestring
-    if(datestring == '0000-00-00 00:00:00' or datestring == ''):
-        # print(f'weird datestring found {datestring}')
+
+    if datestring in ('0000-00-00 00:00:00', '', 'NULL', None):
         datestring = '1990-01-01 00:00:00'
-    if(datestring in ("NULL", None, 'NULL')):
+
+    # Parse the string into naive datetime
+    d = datetime.strptime(datestring, '%Y-%m-%d %H:%M:%S')
+
+    # Localize to old DB timezone (UTC-8, no DST)
+    old_tz = pytz.FixedOffset(-480)  # UTC-8 is -480 minutes
+    localized = old_tz.localize(d)
+
+    # Convert to UTC
+    return localized.astimezone(pytz.utc)
+
+def time_pacific_to_utc(datestring):
+    if isinstance(datestring, datetime):
+        return datestring
+
+    if datestring in ('0000-00-00 00:00:00', '', 'NULL', None):
         datestring = '1990-01-01 00:00:00'
-    d = datetime.strptime(datestring,'%Y-%m-%d %H:%M:%S')
-    pst = pytz.timezone("US/Eastern")
-    esdate = pst.localize(d)
-    utcdate = esdate.astimezone(pytz.utc)
-    return utcdate
+
+    # Parse the string into a naive datetime
+    d = datetime.strptime(datestring, '%Y-%m-%d %H:%M:%S')
+
+    # Set the original timezone to Pacific Time (no DST assumed)
+    pacific = pytz.timezone("US/Pacific")
+    localized_date = pacific.localize(d)
+
+    # Convert to UTC
+    utc_date = localized_date.astimezone(pytz.utc)
+
+    return utc_date
 
 def convert_null(value):
     return None if value == "NULL" else value
@@ -301,7 +358,7 @@ def validate_date(string):
         return None
     try:
         valid_date = datetime.strptime(string, '%Y-%m-%d %H:%M:%S')
-        return time_es_to_utc(valid_date)
+        return time_pacific_to_utc(valid_date)
     except ValueError:
         try:
             valid_date = datetime.strptime(string, '%Y-%m-%d')

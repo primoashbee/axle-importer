@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 def process_row(row):
     
-    if(row['leadID'] == None or row['leadID'] == "NULL"):
+    if(row['leadID'] == None or row['leadID'] == "NULL" ):
         print("skip")
         return False
     
@@ -25,8 +25,8 @@ def process_row(row):
     if(vehicle_id == None):
        return False
     
-    created_at = time_es_to_utc(row['updatedAt']).strftime('%Y-%m-%d %H:%M:%S')
-    updated_at = time_es_to_utc(row['updatedAt']).strftime('%Y-%m-%d %H:%M:%S')
+    created_at = time_pacific_to_utc(row['updatedAt']).strftime('%Y-%m-%d %H:%M:%S')
+    updated_at = time_pacific_to_utc(row['updatedAt']).strftime('%Y-%m-%d %H:%M:%S')
 
     lead_vehicle_data = {
         "lead_id": lead_id,
@@ -46,12 +46,13 @@ def process_row(row):
     return lead_vehicle_id > 0
 def create_vehicle_from_lead_vehicle_row(row):
 
-    created_at = time_es_to_utc(row['updatedAt']) #.strftime('%Y-%m-%d %H:%M:%S')
-    updated_at = time_es_to_utc(row['updatedAt'])
+    created_at = time_pacific_to_utc(row['updatedAt']) #.strftime('%Y-%m-%d %H:%M:%S')
+    updated_at = time_pacific_to_utc(row['updatedAt'])
 
     make_id = get_or_create_make(row['make'],created_at,updated_at)
     model_id = get_or_create_model(row['model'], make_id,created_at,updated_at)
     type_id = get_or_create_type(row.get('classification'),created_at,updated_at)
+
     data = {
         "model_id": model_id,
         "make_id": make_id,
@@ -71,7 +72,6 @@ def create_vehicle_from_lead_vehicle_row(row):
         "created_at": created_at,
         "updated_at": updated_at
     }
-    # print(data)
     return create_vehicle(data)
 
 def read_csv():

@@ -15,22 +15,26 @@ def process_row(row):
 def create_notes(row):
     if(row['target_type'] == 'event'):
         return False
+    if(row['target_id'] not in [2995, "2995"]):
+        return False
     attendant = get_attendant(row['target_type'], row['target_id'])
-    
+ 
     if(attendant['attendant_id'] is None):
         return False
-    migId = None
+    
     if(attendant['attendant_type'] == 'lead'):
         migId = getRelatedId("lead_notes","migration_source_id", row['id'])
         
     if(attendant['attendant_type'] == 'customer'):
         migId = getRelatedId("customer_notes","migration_source_id", row['id'])
 
-    
+    userId = getRelatedId('users','migration_source_id', row['creator_id'])
+
     if(migId != None):
+        # Update the note to the correct lead / customer
+        update_note(row['id'], attendant['attendant_type'], attendant['attendant_id'], row['content'], userId)
         return False
     
-    userId = getRelatedId('users','migration_source_id', row['creator_id'])
     # created_date = time_pacific_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     created_date = row['createdAt']
 
@@ -89,6 +93,29 @@ def create_notes(row):
         return True
 
 
+def update_note(migration_source_id, attendant_type, attendant_id, content, user_id):
+    if(attendant_type == 'lead'):
+        update_query = """
+        UPDATE lead_notes set lead_id = %s, user_id = %s where migration_source_id = %s
+        """
+
+
+    if(attendant_type == 'customer'):
+        update_query = """
+        UPDATE customer_notes set customer_id = %s, user_id = %s where migration_source_id = %s
+        """
+
+    cursor.execute(update_query, (
+        attendant_id,
+        user_id,
+        migration_source_id
+    ))
+    conn.commit()
+
+    print(f'Updated note {migration_source_id} to {attendant_type} {attendant_id}')
+    return True
+
+    
 def read_csv():
     source_csv = "files/note_view.csv"
     i = 0

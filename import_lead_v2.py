@@ -55,11 +55,11 @@ def execute():
 def process_row(row):
     row = {key: (None if value == 'NULL' else value) for key, value in row.items()}
 
-    # migId = getRelatedId("leads", "migration_source_id", row['leadID'])
+    migId = getRelatedId("leads", "migration_source_id", row['leadID'])
 
-    # if(migId):
-    #     #print(f"Skipping.. {row['leadID']}")
-    #     return False
+    if(migId):
+        changeMigId(row['leadID'])
+        return False
     is_internet = True if row['sourceType'] == 'Internet' else False
     
     leadSourceId = getLeadSourceId(row['sourceName'], is_internet);
@@ -80,7 +80,7 @@ def process_row(row):
         "email": row['email'].lower() if row['email'] is not None else None,
         "lead_source_id": leadSourceId,
         "lead_status_id": leadStatusID,
-        "middle_intial": row['middleInitial'],
+        "middle_initial": row['middleInitial'],
         "migration_source_id": row['leadID'],
         "assignee_id": assigneeId,
         "created_at": row["createdAt"],
@@ -128,6 +128,13 @@ def getLeadSourceId(source, is_internet):
     result = cursor.fetchone()
     return result[0] if result else createLeadSource(source,is_internet)
 
+def changeMigId(migration_source_id):
+    update_query = """
+    UPDATE leads SET migration_source_id = %s WHERE migration_source_id = %s
+    """
+    cursor.execute(update_query, (f"_{migration_source_id}", migration_source_id))
+    conn.commit()
+    return True
 def createLeadSource(source, is_internet):
     insert_query = """
     INSERT INTO lead_sources (
@@ -196,7 +203,7 @@ def createLead(data):
     cursor.execute(insert_query, (
         data["first_name"], data["last_name"], data["phone_number"], data["email"],
         json.dumps(data["rowData"]), data["lead_source_id"], data["lead_status_id"], data["assignee_id"],
-        data["middle_intial"], json.dumps({}), data["migration_source_id"], data["created_at"], data["updated_at"]
+        data["middle_initial"], json.dumps({}), data["migration_source_id"], data["created_at"], data["updated_at"]
     ))
     conn.commit()
     return cursor.lastrowid
@@ -211,6 +218,8 @@ def getLeadId(migration_source_id, data):
     cursor.execute(query, [migration_source_id] + leadDummyPhones)
     result = cursor.fetchone()
     if result:
+        # UPDATE LEAD
+        update_lead(data, migration_source_id)
         return result[0]
     
     # query = "SELECT id FROM leads WHERE LOWER(email) = %s OR phone_number = %s"    
@@ -236,6 +245,8 @@ def getLeadId(migration_source_id, data):
     
     # # If neither exists, create a new lead
     return createLead(data)
+def update_lead(data, migration_source_id):
+    return True
 
 def delete_lead(migration_source_id):
     # Delete the lead with the given migration_source_id
@@ -246,7 +257,7 @@ def delete_lead(migration_source_id):
     conn.commit()
     return True
 def read_csv():
-    source_csv = "may 2025 exports/leads_may_2025_view.csv"
+    source_csv = "files/leads.csv"
     i = 0
     with open(source_csv, mode='r', newline='', encoding='utf-8') as file:
         reader = list(csv.DictReader(file))

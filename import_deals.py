@@ -29,7 +29,7 @@ def process_row(row):
     # ];
 
     # if no customer id, return false
-    if(row['buyerID'] is None):
+    if(row['buyerID'] in [None, 'NULL', '']):
         return False
     
     # get customer id
@@ -46,6 +46,7 @@ def process_row(row):
     vehicleId = getRelatedId('vehicles','migration_source_id',row['vehicleID']) or None
     
     if(customerId is None):
+        log(f"Customer not found for ID: {row['buyerID']}")
         return False
     deal = {
         'customer_id' : customerId,
@@ -100,6 +101,10 @@ def process_row(row):
 def update_row(row):
 
     customerId = getRelatedId('customers','migration_source_id', row['buyerID'])
+    if(customerId is None):
+        log(f"Customer not found for ID: {row['buyerID']} for deal {row['dealID']}")
+        return False
+    return True
     salesRepId = getRelatedId('users','migration_source_id',row['saleRepID']) or None
     financeManagerId = getRelatedId('users','migration_source_id',row['financeManagerID']) or None
     salesManagerId = getRelatedId('users','migration_source_id',row['saleManagerID']) or None

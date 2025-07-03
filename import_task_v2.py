@@ -107,7 +107,9 @@ def process_row(task_type, row):
 def process_row_follow_up(row):
     mig_id = getRelatedId('tasks','migration_source_id',row['id'])
     if (mig_id != None):
-        #print(f"Task with migration source id {row["id"]} exists. Skipping.")
+        # Update the follow up task to the certain user
+        
+        # print(f"Task with migration source id {row["id"]} exists. Skipping.")
         return False
     attendant = get_attendant(row['attendant_type'],row['attendant_id'])
     if(attendant['lead_id'] == None and attendant['customer_id'] == None):
@@ -1520,7 +1522,9 @@ def get_source_csv(task_type):
             return "may-2025-files/reminder.csv"
         case "other":
             return "may-2025-files/other.csv"
-            
+
+# def update_task_migration_id(task_type, old_id, new_id):
+
 
 def read_csv(task_type):
     source_csv = get_source_csv(task_type)

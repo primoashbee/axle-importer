@@ -13,8 +13,8 @@ def process_row(row):
     if getRelatedId('lead_sms_logs','migration_source_id',row['messageID']) != None:
         return False
 
-    created_at = time_es_to_utc(row["createdAt"]).strftime('%Y-%m-%d %H:%M:%S')
-    updated_at = time_es_to_utc(row["createdAt"]).strftime('%Y-%m-%d %H:%M:%S')
+    created_at = time_pacific_to_utc(row["createdAt"]).strftime('%Y-%m-%d %H:%M:%S')
+    updated_at = time_pacific_to_utc(row["createdAt"]).strftime('%Y-%m-%d %H:%M:%S')
     user_id = getRelatedId('users','migration_source_id',row['userID'])
     lead_id = getRelatedId('leads','migration_source_id',row['leadID'])
     if(user_id == None or lead_id == None):

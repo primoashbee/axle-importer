@@ -9,3 +9,10 @@ may*/
 *.dump
 *.log
 .DS_Store
+.DS_Store
+combined_with_filenames.pdf
+combined.pdf
+__pycache__
+__pycache__/*
+sendgrid_templates/*
+__pycache__/helpers.cpython-312.pyc

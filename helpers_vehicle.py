@@ -75,8 +75,8 @@ def get_or_create_model(model, make_id, created_at, updated_at):
 
 
 def get_vehicle_id(data):
-    created_at = time_es_to_utc(data['createdAt']) #.strftime('%Y-%m-%d %H:%M:%S')
-    updated_at = time_es_to_utc(data['updatedAt']) #.strftime('%Y-%m-%d %H:%M:%S')
+    created_at = time_pacific_to_utc(data['createdAt']) #.strftime('%Y-%m-%d %H:%M:%S')
+    updated_at = time_pacific_to_utc(data['updatedAt']) #.strftime('%Y-%m-%d %H:%M:%S')
 
     make_id = get_or_create_make(data['make'],created_at,updated_at)
     model_id = get_or_create_model(data['model'],make_id, created_at, updated_at)
