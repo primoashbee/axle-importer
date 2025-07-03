@@ -2,11 +2,11 @@ import requests
 import os
 import json
 import re
-# SENDGRID_API_KEY=""
-# HEADERS = {
-#     'Authorization': f'Bearer {SENDGRID_API_KEY}',
-#     'Content-Type': 'application/json'
-# }
+SENDGRID_KEY=""
+HEADERS = {
+    'Authorization': f'Bearer {SENDGRID_KEY}',
+    'Content-Type': 'application/json'
+}
 
 # Create output directory
 os.makedirs("sendgrid_templates", exist_ok=True)
