@@ -2,7 +2,7 @@ import requests
 import os
 import json
 import re
-SENDGRID_API_KEY = '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'
+SENDGRID_API_KEY=""
 HEADERS = {
     'Authorization': f'Bearer {SENDGRID_API_KEY}',
     'Content-Type': 'application/json'
