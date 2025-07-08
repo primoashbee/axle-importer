@@ -15,8 +15,6 @@ def process_row(row):
 def create_notes(row):
     if(row['target_type'] == 'event'):
         return False
-    if(row['target_id'] not in [2995, "2995"]):
-        return False
     attendant = get_attendant(row['target_type'], row['target_id'])
  
     if(attendant['attendant_id'] is None):
@@ -33,7 +31,7 @@ def create_notes(row):
     if(migId != None):
         # Update the note to the correct lead / customer
         update_note(row['id'], attendant['attendant_type'], attendant['attendant_id'], row['content'], userId)
-        return False
+        return True
     
     # created_date = time_pacific_to_utc(row['createdAt']).strftime('%Y-%m-%d %H:%M:%S')
     created_date = row['createdAt']
@@ -63,7 +61,7 @@ def create_notes(row):
         }
         
         createEventLog('lead', attendant['attendant_id'], 'lead-note-created', logData, created_date)
-        return True
+        return bool(noteId)
 
     if(attendant['attendant_type'] == 'customer'):
         

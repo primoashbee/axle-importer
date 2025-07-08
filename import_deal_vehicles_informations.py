@@ -21,33 +21,33 @@ def process_row(row):
     ))
     conn.commit()
 
-    # query = """
-    #     UPDATE vehicle_additional_information 
-    #     SET 
-    #     color = %s,
-    #     trim = %s,
-    #     hard_pack = %s,
-    #     invoice = %s,
-    #     net_cost = %s,
-    #     pack = %s,
-    #     package = %s,
-    #     retail_value = %s
-    #     where vehicle_id IN (
-    #         SELECT id from vehicles WHERE vin = %s
-    #     )
-    # """
-    # cursor.execute(query, (
-    #     row['color'],
-    #     row['trimLevel'],
-    #     row['hardPack'] if row['hardPack'] else 0,
-    #     row['invoice'] if row['invoice'] else 0,
-    #     row['netCost'] if  row['netCost'] else 0,
-    #     row['pack'] if row['pack'] else 0,
-    #     row['package'] if row['package'] else None,
-    #     row['retailValue'] if row['retailValue'] else 0,    
-    #     row['VIN']
-    # ))
-    # conn.commit()
+    query = """
+        UPDATE vehicle_additional_information 
+        SET 
+        color = %s,
+        trim = %s,
+        hard_pack = %s,
+        invoice = %s,
+        net_cost = %s,
+        pack = %s,
+        package = %s,
+        retail_value = %s
+        where vehicle_id IN (
+            SELECT id from vehicles WHERE vin = %s
+        )
+    """
+    cursor.execute(query, (
+        row['color'],
+        row['trimLevel'],
+        row['hardPack'] if row['hardPack'] else 0,
+        row['invoice'] if row['invoice'] else 0,
+        row['netCost'] if  row['netCost'] else 0,
+        row['pack'] if row['pack'] else 0,
+        row['package'] if row['package'] else None,
+        row['retailValue'] if row['retailValue'] else 0,    
+        row['VIN']
+    ))
+    conn.commit()
 
    
     return cursor.rowcount > 0

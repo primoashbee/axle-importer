@@ -6,6 +6,7 @@ import pytz
 import re
 import logging
 import pymysql
+import redis
 # host = "axle-prd-usea1-crm-db.cjjspmdvfxbj.us-east-1.rds.amazonaws.com"
 mode = "local"
 # host = "awseb-e-3rznwcyhm9-stack-awsebrdsdatabase-hmh4mlz3imqs.cjjspmdvfxbj.us-east-1.rds.amazonaws.com",
@@ -24,7 +25,7 @@ mode = "local"
 #LOCAL 
 if(mode == "prod"):
     conn = psycopg2.connect(
-        dbname="axle-crm-prod",
+        dbname="axle-july-5",
         user="postgres",
         password="Hbo2lUswKWgywwZ",
         host="axle-prd-usea1-crm-db.cjjspmdvfxbj.us-east-1.rds.amazonaws.com",
@@ -86,7 +87,6 @@ def createEventLog(loggable, loggableId, event, logData, createdAt):
     """
         Mimic createEventLog on Laravel app.
     """
-    return True
     data = {
             "user_type" : None,
             "user_id" : None,
@@ -117,6 +117,7 @@ def createEventLog(loggable, loggableId, event, logData, createdAt):
         %s, %s, %s, %s,
         %s, %s, %s, %s
     )
+    RETURNING id
     """
     cursor.execute(insert_query, (
         data["user_type"], data["user_id"], data["event"], data["auditable_type"], data["auditable_id"],
@@ -125,6 +126,10 @@ def createEventLog(loggable, loggableId, event, logData, createdAt):
     ))
 
     conn.commit()
+    result = cursor.fetchone()
+    if result:
+        return result[0]
+    return None
     
     
 def createUser(name,email,migration_source_id,firstname,lastname):
@@ -213,6 +218,33 @@ def get_lead_info(id):
         data = dict(zip(fields, result))
         return data
     else:
+        return None
+    
+def get_lead_info_by_migration_source_id(migration_source_id):
+    if(id == None):
+        return None
+    query = sql.SQL(f"select id, concat(first_name,' ', last_name) as full_name from leads WHERE migration_source_id ='{migration_source_id}'")
+    cursor.execute(query)
+    result = cursor.fetchone()
+    if result:
+        fields = [field[0] for field in cursor.description]
+        data = dict(zip(fields, result))
+        return data
+    else:
+        return None
+    
+def get_customer_info_by_migration_source_id(migration_source_id):
+    if(id == None):
+        return None
+    query = sql.SQL(f"select id, concat(first_name,' ', last_name) as full_name from customers WHERE migration_source_id = '{migration_source_id}'")
+    cursor.execute(query)
+    result = cursor.fetchone()
+    if result:
+        fields = [field[0] for field in cursor.description]
+        data = dict(zip(fields, result))
+        return data
+    else:
+        log(f"Customer with migration_source_id {migration_source_id} not found.")
         return None
 
 def get_lead_name(id):
@@ -445,3 +477,53 @@ def get_linked_customer_by_lead_id(lead_id):
     cursor.execute(query, (lead_id,))
     result = cursor.fetchone()
     return result if result else None
+
+REDIS_HOST = "127.0.0.1"
+REDIS_PORT = 6379
+REDIS_PASSWORD = None
+
+# Connect to Redis
+redis_client = redis.StrictRedis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    password=REDIS_PASSWORD,
+    decode_responses=True
+)
+
+def cache_users():
+    query = "SELECT id, migration_source_id, lower(email), name FROM users"
+    cursor.execute(query)
+    rows = cursor.fetchall()  # Fetch all rows from the query
+
+    if not rows:
+        print("No rows found in the users table.")
+        return
+
+    for row in rows:
+        # Sanitize data to handle None values
+        sanitized_row = {
+            'id': row[0] if row[0] is not None else '',
+            'migration_source_id': row[1] if row[1] is not None else '',
+            'email': row[2] if row[2] is not None else '',
+            'name': row[3] if row[3] is not None else ''
+        }
+
+        # print(f"Caching user: {sanitized_row}")  # Log the sanitized user data
+        redis_client.hset(f"user:{sanitized_row['email']}", mapping=sanitized_row)
+
+def get_user_by_email(email):
+    """
+    Retrieve user data from Redis using email.
+    """
+    user_data = redis_client.hgetall(f"user:{email.lower()}")
+    if user_data:
+        return user_data
+    else:
+        log(f"User with email {email} not found in Redis.")
+        return None
+    
+def check_if_user_exists(email):
+    """
+    Check if a user exists in Redis by email.
+    """
+    return redis_client.exists(f"user:{email}") > 0

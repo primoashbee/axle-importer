@@ -105,6 +105,7 @@ def create_lead_sms(row):
     if(phone_object['id'] is not None):
         is_inbound = True
     if(migId is not None):
+        return False
         update_query="""
             UPDATE phone_number_sms_logs SET
             "from" = %s,
@@ -518,7 +519,7 @@ def create_customer_sms(row):
         return False
 
 def read_csv():
-    source_csv = "files/messages.csv"
+    source_csv = "files/lead_text_messages_view.csv"
     # source_csv = "files/lead_mail_view.csv"
     # source_csv = "files/lead_sms_view.csv"
     # source_csv = "files/messages-customers.csv"
