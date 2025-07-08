@@ -5,6 +5,7 @@ from datetime import datetime
 import pytz
 import re
 import logging
+import pymysql
 # host = "axle-prd-usea1-crm-db.cjjspmdvfxbj.us-east-1.rds.amazonaws.com"
 mode = "local"
 # host = "awseb-e-3rznwcyhm9-stack-awsebrdsdatabase-hmh4mlz3imqs.cjjspmdvfxbj.us-east-1.rds.amazonaws.com",
@@ -41,13 +42,43 @@ if(mode == "qa"):
 
 if(mode == "local"):
     conn = psycopg2.connect(
-        dbname="jun-13-bup",
+        dbname="axle-crm-prod",
         user="postgres",
-        password="root",
+        password="",
         host="localhost",
         port=5432
     )
 # )
+    
+
+#LOCAL 
+# if(mode == "prod"):
+#     conn = pymysql.connect(
+#         database="axle-crm-prod",
+#         user="postgres",
+#         password="Hbo2lUswKWgywwZ",
+#         host="axle-prd-usea1-crm-db.cjjspmdvfxbj.us-east-1.rds.amazonaws.com",
+#         port=5432
+#     )
+
+# if(mode == "qa"):
+#     conn = pymysql.connect(
+#         database="prod_bup_20250330",
+#         user="postgres",
+#         password="GAtCxz9a2zGNQQ",
+#         host="awseb-e-3rznwcyhm9-stack-awsebrdsdatabase-hmh4mlz3imqs.cjjspmdvfxbj.us-east-1.rds.amazonaws.com",
+#         port=5432
+#     )
+
+# if(mode == "local"):
+#     conn = pymysql.connect(
+#         database="axle-bup",
+#         user="postgres",
+#         password="",
+#         host="localhost",
+#         port=5432
+#     )
+
 global cursor
 cursor = conn.cursor()
 
@@ -55,7 +86,7 @@ def createEventLog(loggable, loggableId, event, logData, createdAt):
     """
         Mimic createEventLog on Laravel app.
     """
-
+    return True
     data = {
             "user_type" : None,
             "user_id" : None,
@@ -406,3 +437,11 @@ def log(value):
         format="%(asctime)s - %(message)s",
     )
     logging.info(value)
+
+def get_linked_customer_by_lead_id(lead_id):
+    query = """
+    SELECT * FROM lead_customer_linking_migration WHERE lead_migration_id = %s
+    """
+    cursor.execute(query, (lead_id,))
+    result = cursor.fetchone()
+    return result if result else None

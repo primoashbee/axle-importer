@@ -88,7 +88,8 @@ def formatVehicleData(row):
         "body_style":row["bodyStyle"],
         "migration_source_id": None,
         "created_at": created_at,
-        "updated_at": updated_at
+        "updated_at": updated_at,
+        "provider_response": json.dumps(row)
     }
 
     return data

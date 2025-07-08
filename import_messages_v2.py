@@ -7,15 +7,24 @@ import uuid
 import json
 import logging
 from tqdm import tqdm
-
+import traceback
 
 csv.field_size_limit(sys.maxsize)
 
 def process_row(row):
-    if(row['recipientID'] not in [2995, "2995"]):
-        return False
-    row_type = row['type']
 
+    row_type = row['type']
+    recipient = row['recipient']
+        # return False
+    
+    # if( row['messageID'] not in [43268, '43268']):
+    #     return False
+    if row_type == 'mail':
+        return False
+    
+    # if(row['recipientID'] not in [1995, '1995', 4954, '4954', 13552, '13552'] ):
+    # if(row['recipientID'] not in [27457, '27457', 1995, '1995', 4954, '4954', 13552, '13552'] ):
+    #     return False
     # if (row_type == 'mail' and getRelatedId('email_logs','migration_source_id',row['messageID']) != None):
     # if (row_type == 'mail'):
     #     print(f"Skipping.. {row['messageID']}")
@@ -26,27 +35,63 @@ def process_row(row):
     #     print(f"Skipping.. {row['messageID']}")
     #     return False
     
-    recipient = row['recipient']
     
 
     # Done
-    if( recipient == 'lead' and row_type == 'text'):
-        return create_lead_sms(row)
-    
-    # Done
-    if( recipient == 'lead' and row_type == 'mail'):
-        return create_lead_email(row)
-    
-    if( recipient == 'customer' and row_type == 'mail'):
-        return create_customer_email(row)
-    
-    if( recipient == 'customer' and row_type == 'text'):
-        return create_customer_sms(row)
+    try:
+        if( recipient == 'lead' and row_type == 'text'):
+            return create_lead_sms(row)
         
+        # Done
+        if( recipient == 'lead' and row_type == 'mail'):
+            return False
+            return create_lead_email(row)
+        
+        if( recipient == 'customer' and row_type == 'mail'):
+            return False
+            return create_customer_email(row)
+        
+        if( recipient == 'customer' and row_type == 'text'):
+            log_id = create_customer_sms(row)
+            return log_id
+    except Exception as e:   
+        log(f"Error processing row {row['messageID']}: {e} {row}")
+        traceback.print_exc() 
+        # return create_customer_sms(row)
+        
+
+def create_lead_to_customer_sms(row, linked_customer):
+    # log(f"Inside lead to customer sms: {row}")
+    # if(row['from'] is None):
+    #     log(f"None From: {row}")
+    is_inbound = False if '@' in row['from'] else True
+    # log(f"Is inbound: {is_inbound}")
+    from_number = linked_customer[12] if is_inbound else row['from']
+    to_number = linked_customer[12] if is_inbound else row['to']
+
+    from_number = from_number if from_number is not None else row['from']
+    to_number = to_number if to_number is not None else row['to']
+    # log("Creating lead to customer SMS log for " + row['messageID'])
+    # log(f"From number: {from_number}, To number: {to_number}")
+    row['recipientID'] = str(linked_customer[3])
+    row['from'] = from_number
+    row['to'] = to_number
+    log_id = create_customer_sms(row)
+    # is inbound update the from else to
+
+
+
+    return 1
 
 def create_lead_sms(row):
     sentBy = get_user_id_by_email(row['from'])
     userName = get_username(sentBy)
+    
+    linked_customer = get_linked_customer_by_lead_id(row['recipientID'])
+    if( linked_customer is not None):
+        log_id = create_lead_to_customer_sms(row, linked_customer)
+        return bool(log_id)
+    
     leadId = getRelatedId('leads','migration_source_id',row['recipientID'])
 
     if(sentBy == None):
@@ -352,49 +397,52 @@ def create_customer_email(row):
         return False
 
 def create_customer_sms(row):
-    sentBy = get_user_id_by_email(row['from'])
-    userName = get_username(sentBy)
+    is_inbound = False if '@' in row['from'] else True
+    sentBy = None if is_inbound else get_user_id_by_email(row['from'])
     customerId = getRelatedId('customers','migration_source_id',row['recipientID'])
-
     if(sentBy == None):
-        sentBy = getRelatedId('users','personal_phone_number',row['from']) or 2
+        sentBy = getRelatedId('users','personal_phone_number',row['from']) 
+        if( sentBy == None):
+            sentBy = getRelatedId('users','email',row['from']) or 2
     if(customerId == None):
         return False
+    userName = get_username(sentBy)
     
     
     migId = getRelatedId('phone_number_sms_logs','migration_source_id',row['messageID'])
     
     if(migId != None):
+        # log(f"Skipping.. {row['messageID']}")
         # if( '@' in row['to']):
         #     print(row['to'])
         # from_ = add_dashes(row['from'], "user"),
         # to_   = add_dashes(row['to']),
         # message_ = row['messageID']
 
-        
-        # update_query="""
-        #     UPDATE phone_number_sms_logs SET
-        #     "from" = %s,
-        #     "to" = %s
-        #     where migration_source_id = %s
-        # """
+        update_query="""
+            UPDATE phone_number_sms_logs SET
+            "from" = %s,
+            "to" = %s
+            where migration_source_id = %s
+        """
 
-        # cursor.execute(update_query, (
-        #     add_dashes(row['from']),
-        #     add_dashes(row['to']),
-        #     row['messageID']
-        # ))
+        cursor.execute(update_query, (
+            add_dashes(row['from']),
+            add_dashes(row['to']),
+            row['messageID']
+        ))
 
         
-        # conn.commit()
+        conn.commit()
         # print(f"Updated {row['messageID']}")
-        return True
-
+        return row['messageID']
+    
+    from_number = add_dashes(row['from']) if is_inbound else '+13017533306' 
     phoneNumberSmsLogObject = { 
-        "from": add_dashes(row['from']),
+        "from": from_number,
         "to": add_dashes(row['to']),
         "content": row['body'].replace('\x00', '').encode('utf-8').decode('utf-8'),
-        "is_inbound": False,
+        "is_inbound": is_inbound,
         "provider_message_id": str(uuid.uuid4()),
         "provider_response": json.dumps(row),
         "occurred_at": time_pacific_to_utc(row['createdAt']),
@@ -444,18 +492,17 @@ def create_customer_sms(row):
         conn.commit()
         # print(f"Imported {row['messageID']}")
         phoneNumberSmsLogId = cursor.fetchone()[0]
-        
         logData = {
-            'from_name' : userName,
+            'from_name' :get_customer_name(customerId) if is_inbound else userName,
             'from_id' : sentBy,
-            'to_id' : customerId,
-            'to_name' : get_customer_name(customerId),
-            'to_email': get_customer_email(customerId),
+            'to_id' : sentBy if is_inbound else customerId,
+            'to_name' : userName if is_inbound else get_customer_name(customerId),
+            'to_email':  row['to'] if is_inbound else get_customer_email(customerId),
             'message': row['body'].replace('\x00', '').encode('utf-8').decode('utf-8')
         }
 
         createEventLog('customer',customerId, 'sms_sent', logData, phoneNumberSmsLogObject['created_at'])
-        return True
+        return phoneNumberSmsLogId
     except Exception as e:
         actual_query = insert_query % tuple(map(lambda x: f"'{x}'" if isinstance(x, str) else x, values))
         log_file = "app.log"
